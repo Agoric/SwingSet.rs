@@ -1,6 +1,6 @@
 use swingset::{
-    Config, Controller, Dispatch, Syscall, VatExportID, VatImportID, VatName, VatPromiseID,
-    VatSendTarget, VatSyscall,
+    Config, Controller, Dispatch, Syscall, VatExportID, VatImportID, VatName,
+    VatPromiseID, VatSendTarget, VatSyscall,
 };
 
 #[derive(Debug)]

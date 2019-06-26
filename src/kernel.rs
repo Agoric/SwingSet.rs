@@ -1,4 +1,4 @@
-use super::vat::{Dispatch, VatExportID, VatSyscall};
+use super::vat::{Dispatch, Syscall, VatExportID, VatSyscall};
 use super::vatname::VatName;
 use std::collections::{HashMap, VecDeque};
 use std::fmt;
@@ -104,7 +104,7 @@ impl Kernel {
                 //let vid = self.map_inbound(&vn, kid);
                 let vid = self.map_export_target(kid);
                 let dispatch = self.vats.get(&vn).unwrap();
-                let mut syscall = VatSyscall::new();
+                let mut syscall: Box<dyn Syscall> = Box::new(VatSyscall::new());
                 dispatch.deliver(&mut syscall, vid);
             }
             //Target::Promise(_pid) => {}

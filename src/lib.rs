@@ -2,6 +2,8 @@ mod config;
 mod controller;
 mod kernel;
 mod kernel_types;
+#[cfg(test)]
+mod test;
 mod vat;
 mod vat_types;
 

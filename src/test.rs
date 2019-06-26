@@ -1,4 +1,4 @@
-use swingset::{
+use super::{
     Config, Controller, Dispatch, Syscall, VatExportID, VatImportID, VatName,
     VatPromiseID, VatSendTarget,
 };
@@ -23,7 +23,8 @@ impl Dispatch for Vat1Dispatch {
     }
 }
 
-fn main() {
+#[test]
+fn test_build() {
     let mut cfg = Config::new();
     let vat1 = Vat1Dispatch {};
     cfg.add_vat(&VatName("bootstrap".to_string()), vat1);

@@ -33,16 +33,20 @@ impl fmt::Display for KernelResolverID {
     }
 }
 
+/// KernelArgSlots live in the run-queue, as arguments of a message delivery.
+/// They will be passed into the Vat during dispatch.deliver. They also
+/// arrive from vats as the target and args of syscall.send.
 #[derive(Debug)]
-pub(crate) enum Target {
+pub(crate) enum KernelArgSlot {
     Export(VatName, KernelExportID),
     Promise(KernelPromiseID),
 }
-impl fmt::Display for Target {
+impl fmt::Display for KernelArgSlot {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        use KernelArgSlot::*;
         match self {
-            Target::Export(vn, id) => write!(f, "Target({}:{})", vn, id),
-            Target::Promise(id) => write!(f, "Target(Promise-{})", id),
+            Export(vn, id) => write!(f, "KernelArgSlot({}:{})", vn, id),
+            Promise(id) => write!(f, "KernelArgSlot(Promise-{})", id),
         }
     }
 }

@@ -1,12 +1,12 @@
 use super::kernel_types::{
-    KernelExportID, KernelPromiseID, KernelResolverID, Target, VatName,
+    KernelArgSlot, KernelExportID, KernelPromiseID, KernelResolverID, VatName,
 };
 use super::vat::{Dispatch, VatSyscall};
 use super::vat_types::VatExportID;
 use std::collections::{HashMap, VecDeque};
 
 pub struct PendingDelivery {
-    target: Target,
+    target: KernelArgSlot,
     method: String,
     args: u8,
     resolver: KernelResolverID,
@@ -42,7 +42,7 @@ impl Kernel {
     pub fn push(&mut self, name: &VatName, export: KernelExportID, method: String) {
         let (_pid, rid) = self.allocate_promise_resolver_pair();
         let pd = PendingDelivery {
-            target: Target::Export(VatName(name.0.clone()), export),
+            target: KernelArgSlot::Export(VatName(name.0.clone()), export),
             method,
             args: 0,
             resolver: rid,
@@ -63,14 +63,14 @@ impl Kernel {
         let t = pd.target;
         println!("process: {}.{}", t, pd.method);
         match t {
-            Target::Export(vn, kid) => {
+            KernelArgSlot::Export(vn, kid) => {
                 //let vid = self.map_inbound(&vn, kid);
                 let vid = self.map_export_target(kid);
                 let dispatch = self.vats.get(&vn).unwrap();
                 let mut syscall = VatSyscall::new(&mut self.run_queue);
                 dispatch.deliver(&mut syscall, vid);
             }
-            //Target::Promise(_pid) => {}
+            //KernelArgSlot::Promise(_pid) => {}
             _ => panic!(),
         };
     }

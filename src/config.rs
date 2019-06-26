@@ -1,5 +1,5 @@
+use super::kernel_types::VatName;
 use super::vat::Dispatch;
-use super::vatname::VatName;
 use std::collections::HashMap;
 
 /*#[derive(PartialEq, Eq, Debug, Hash)]

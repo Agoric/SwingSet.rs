@@ -1,7 +1,7 @@
 //use std::fmt::Debug;
 use super::config::Config;
-use super::kernel::{Kernel, KernelExportID};
-use super::vatname::VatName;
+use super::kernel::Kernel;
+use super::kernel_types::{KernelExportID, VatName};
 
 //#[derive(Debug)]
 pub struct Controller {

@@ -1,33 +1,6 @@
-use std::fmt;
-
-#[derive(Debug)]
-pub struct VatPromiseID(pub u32);
-impl fmt::Display for VatPromiseID {
-    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-        write!(f, "VatPromiseID-{}", self.0)
-    }
-}
-
-#[derive(Debug)]
-pub struct VatExportID(pub u32);
-impl fmt::Display for VatExportID {
-    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-        write!(f, "VatExportID-{}", self.0)
-    }
-}
-
-#[derive(Debug)]
-pub struct VatImportID(pub u32);
-impl fmt::Display for VatImportID {
-    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-        write!(f, "VatImportID-{}", self.0)
-    }
-}
-
-pub enum VatSendTarget {
-    Import(VatImportID),
-    _Promise(VatPromiseID),
-}
+use super::kernel::PendingDelivery;
+use super::vat_types::{VatExportID, VatPromiseID, VatSendTarget};
+use std::collections::VecDeque;
 
 pub trait Syscall {
     fn send(&mut self, target: VatSendTarget, name: &str) -> VatPromiseID;
@@ -36,12 +9,13 @@ pub trait Syscall {
 #[derive(Debug)]
 pub struct VatSyscall {}
 impl VatSyscall {
-    pub fn new() -> Self {
+    pub fn new(_run_queue: &mut VecDeque<PendingDelivery>) -> Self {
         VatSyscall {}
     }
 }
 impl Syscall for VatSyscall {
-    fn send(&mut self, _target: VatSendTarget, _name: &str) -> VatPromiseID {
+    fn send(&mut self, target: VatSendTarget, name: &str) -> VatPromiseID {
+        println!("syscall.send {}.{}", target, name);
         VatPromiseID(1)
     }
 }

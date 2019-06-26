@@ -21,6 +21,6 @@ impl Syscall for VatSyscall {
 }
 
 pub trait Dispatch {
-    fn deliver(&self, syscall: &mut Box<dyn Syscall>, target: VatExportID) -> ();
+    fn deliver(&self, syscall: &mut dyn Syscall, target: VatExportID) -> ();
     fn notify_resolve_to_target(&self, id: VatPromiseID, target: u8);
 }

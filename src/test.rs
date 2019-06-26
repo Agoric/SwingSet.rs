@@ -6,7 +6,7 @@ use super::{
 #[derive(Debug)]
 struct Vat1Dispatch {}
 impl Dispatch for Vat1Dispatch {
-    fn deliver(&self, syscall: &mut Box<dyn Syscall>, target: VatExportID) -> () {
+    fn deliver(&self, syscall: &mut dyn Syscall, target: VatExportID) -> () {
         println!("Vat1.deliver {}", target);
         match target {
             VatExportID(0) => {

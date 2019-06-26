@@ -1,7 +1,7 @@
 use super::kernel_types::{
     KernelExportID, KernelPromiseID, KernelResolverID, Target, VatName,
 };
-use super::vat::{Dispatch, Syscall, VatSyscall};
+use super::vat::{Dispatch, VatSyscall};
 use super::vat_types::VatExportID;
 use std::collections::{HashMap, VecDeque};
 
@@ -67,8 +67,7 @@ impl Kernel {
                 //let vid = self.map_inbound(&vn, kid);
                 let vid = self.map_export_target(kid);
                 let dispatch = self.vats.get(&vn).unwrap();
-                let mut syscall: Box<dyn Syscall> =
-                    Box::new(VatSyscall::new(&mut self.run_queue));
+                let mut syscall = VatSyscall::new(&mut self.run_queue);
                 dispatch.deliver(&mut syscall, vid);
             }
             //Target::Promise(_pid) => {}

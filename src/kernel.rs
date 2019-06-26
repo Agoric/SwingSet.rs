@@ -43,7 +43,7 @@ impl Kernel {
         let (_pid, rid) = self.allocate_promise_resolver_pair();
         let pd = PendingDelivery {
             target: Target::Export(VatName(name.0.clone()), export),
-            method: method,
+            method,
             args: 0,
             resolver: rid,
         };
@@ -78,10 +78,9 @@ impl Kernel {
 
     pub fn step(&mut self) {
         println!("kernel.step");
-        match self.run_queue.pop_front() {
-            Some(pd) => self.process(pd),
-            None => (),
-        };
+        if let Some(pd) = self.run_queue.pop_front() {
+            self.process(pd);
+        }
     }
 
     pub fn run(&mut self) {

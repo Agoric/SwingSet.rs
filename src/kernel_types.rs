@@ -82,3 +82,9 @@ impl fmt::Display for KernelArgSlot {
         }
     }
 }
+
+impl From<KernelPromiseID> for KernelArgSlot {
+    fn from(id: KernelPromiseID) -> KernelArgSlot {
+        KernelArgSlot::Promise(id)
+    }
+}

@@ -2,8 +2,9 @@ use super::kernel_types::{
     KernelArgSlot, KernelExport, KernelExportID, KernelPromiseID, KernelResolverID,
     KernelTarget, VatName,
 };
-use super::vat::{Dispatch, VatSyscall};
-use super::vat_types::{VatArgSlot, VatExportID, VatImportID};
+use super::vat::{Dispatch, VatManager, VatSyscall};
+use super::vat_types::{VatArgSlot, VatExportID, VatImportID, VatPromiseID};
+use std::cell::Cell;
 use std::collections::{HashMap, VecDeque};
 
 #[derive(Debug)]
@@ -24,7 +25,7 @@ impl PendingDelivery {
             target,
             method: method.to_string(),
             args,
-            resolver: resolver,
+            resolver,
         }
     }
 }
@@ -47,6 +48,23 @@ impl CList {
             KernelArgSlot::Promise(id) => KernelTarget::Promise(id.clone()),
         }
     }
+
+    pub fn map_inbound_promise(&mut self, kpid: KernelPromiseID) -> VatPromiseID {
+        let karg: KernelArgSlot = kpid.into();
+        if let Some(varg) = self.inbound.get(&karg) {
+            use VatArgSlot::*;
+            match varg {
+                Import(..) | Export(..) => panic!(),
+                Promise(vpid) => vpid.clone(),
+            }
+        } else {
+            let vpid = VatPromiseID(4);
+            let varg = VatArgSlot::Promise(vpid.clone());
+            self.inbound.insert(karg.clone(), varg.clone());
+            self.outbound.insert(varg, karg);
+            vpid
+        }
+    }
 }
 
 pub struct VatData {
@@ -61,7 +79,7 @@ pub struct RunQueue(pub VecDeque<PendingDelivery>);
 pub struct Kernel {
     vats: HashMap<VatName, VatData>,
     run_queue: RunQueue,
-    next_promise_resolver_id: u32,
+    next_promise_resolver_id: Cell<u32>,
 }
 
 impl Kernel {
@@ -79,7 +97,7 @@ impl Kernel {
         Kernel {
             vats: kvats,
             run_queue: RunQueue::default(),
-            next_promise_resolver_id: 0,
+            next_promise_resolver_id: Cell::new(0),
         }
     }
 
@@ -107,9 +125,10 @@ impl Kernel {
         clist.outbound.insert(vslot, kslot);
     }
 
-    fn allocate_promise_resolver_pair(&mut self) -> (KernelPromiseID, KernelResolverID) {
-        let id = self.next_promise_resolver_id;
-        self.next_promise_resolver_id += 1;
+    fn allocate_promise_resolver_pair(&self) -> (KernelPromiseID, KernelResolverID) {
+        let id = self.next_promise_resolver_id.get();
+        let next_id = id + 1;
+        self.next_promise_resolver_id.set(next_id);
         (KernelPromiseID(id), KernelResolverID(id))
     }
 
@@ -142,7 +161,19 @@ impl Kernel {
                 let vid = self.map_export_target(kid);
                 //let VatData{ clist, dispatch } = self.vats.get_mut(&vn).unwrap();
                 let vd = self.vats.get_mut(&vn).unwrap();
-                let mut syscall = VatSyscall::new(&mut self.run_queue, &mut vd.clist);
+                let nprid = &self.next_promise_resolver_id;
+                let allocate_promise_resolver_pair = || {
+                    let id = nprid.get();
+                    let next_id = id + 1;
+                    nprid.set(next_id);
+                    (KernelPromiseID(id), KernelResolverID(id))
+                };
+                let vm = VatManager {
+                    run_queue: &mut self.run_queue,
+                    clist: &mut vd.clist,
+                    allocate_promise_resolver_pair: &allocate_promise_resolver_pair,
+                };
+                let mut syscall = VatSyscall::new(vm);
                 vd.dispatch.deliver(&mut syscall, vid);
             }
             //KernelTarget::Promise(_pid) => {}

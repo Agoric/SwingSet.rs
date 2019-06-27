@@ -1,29 +1,45 @@
 use super::kernel::{CList, PendingDelivery, RunQueue};
-use super::kernel_types::{KernelResolverID};
+use super::kernel_types::{KernelPromiseID, KernelResolverID};
 use super::vat_types::{VatExportID, VatPromiseID, VatSendTarget};
+
+pub(crate) struct VatManager<'a> {
+    pub run_queue: &'a mut RunQueue,
+    pub clist: &'a mut CList,
+    pub allocate_promise_resolver_pair: &'a Fn() -> (KernelPromiseID, KernelResolverID),
+}
 
 pub trait Syscall {
     fn send(&mut self, target: VatSendTarget, name: &str) -> VatPromiseID;
 }
 
-#[derive(Debug)]
 pub(crate) struct VatSyscall<'a> {
     run_queue: &'a mut RunQueue,
     clist: &'a mut CList,
+    allocate_promise_resolver_pair: &'a Fn() -> (KernelPromiseID, KernelResolverID),
 }
 impl<'a> VatSyscall<'a> {
-    pub fn new(run_queue: &'a mut RunQueue, clist: &'a mut CList) -> Self {
-        VatSyscall { run_queue, clist }
+    pub fn new(manager: VatManager<'a>) -> Self {
+        VatSyscall {
+            run_queue: manager.run_queue,
+            clist: manager.clist,
+            allocate_promise_resolver_pair: manager.allocate_promise_resolver_pair,
+        }
     }
 }
 impl<'a> Syscall for VatSyscall<'a> {
-    fn send(&mut self, vtarget: VatSendTarget, name: &str) -> VatPromiseID {
+    fn send(
+        &mut self,
+        vtarget: VatSendTarget,
+        name: &str, /*,
+                    apr: u8*/
+    ) -> VatPromiseID {
         println!("syscall.send {}.{}", vtarget, name);
         let ktarget = self.clist.map_outbound_target(vtarget);
         println!(" kt: {}.{}", ktarget, name);
-        let pd = PendingDelivery::new(ktarget, name, 0, KernelResolverID(0));
+        let (kpid, krid) = (self.allocate_promise_resolver_pair)();
+        let pd = PendingDelivery::new(ktarget, name, 0, krid);
         self.run_queue.0.push_back(pd);
-        VatPromiseID(1)
+        self.clist.map_inbound_promise(kpid)
     }
 }
 

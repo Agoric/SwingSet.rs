@@ -1,9 +1,9 @@
 use super::kernel_types::{
-    KernelArgSlot, KernelExport, KernelExportID, KernelPromiseID, KernelResolverID,
-    KernelTarget, VatName,
+    KernelExport, KernelExportID, KernelPromiseID, KernelResolverID, KernelTarget,
+    VatName,
 };
 use super::vat::{Dispatch, VatManager, VatSyscall};
-use super::vat_types::{VatArgSlot, VatExportID, VatImportID, VatPromiseID};
+use super::vat_types::{VatExportID, VatImportID, VatPromiseID, VatSendTarget};
 use std::cell::Cell;
 use std::collections::{HashMap, VecDeque};
 
@@ -32,36 +32,37 @@ impl PendingDelivery {
 
 #[derive(Debug, Default)]
 pub(crate) struct CList {
-    pub inbound: HashMap<KernelArgSlot, VatArgSlot>,
-    pub outbound: HashMap<VatArgSlot, KernelArgSlot>,
+    pub inbound_imports: HashMap<KernelExport, VatImportID>,
+    pub outbound_imports: HashMap<VatImportID, KernelExport>,
+    pub inbound_promises: HashMap<KernelPromiseID, VatPromiseID>,
+    pub outbound_promises: HashMap<VatPromiseID, KernelPromiseID>,
 }
 impl CList {
-    pub fn _map_outbound<T: Into<VatArgSlot>>(&self, target: T) -> KernelArgSlot {
+    /*pub fn _map_outbound<T: Into<VatArgSlot>>(&self, target: T) -> KernelArgSlot {
         let t = self.outbound.get(&target.into()).unwrap();
         (*t).clone()
-    }
+    }*/
 
-    pub fn map_outbound_target<T: Into<VatArgSlot>>(&self, target: T) -> KernelTarget {
-        let t = self.outbound.get(&target.into()).unwrap();
-        match t {
-            KernelArgSlot::Export(ke) => KernelTarget::Export(ke.clone()),
-            KernelArgSlot::Promise(id) => KernelTarget::Promise(id.clone()),
+    pub fn map_outbound_target(&self, target: VatSendTarget) -> KernelTarget {
+        match target {
+            VatSendTarget::Import(viid) => {
+                let ke = self.outbound_imports.get(&viid).unwrap();
+                KernelTarget::Export(ke.clone())
+            }
+            VatSendTarget::Promise(vpid) => {
+                let kpid = self.outbound_promises.get(&vpid).unwrap();
+                KernelTarget::Promise(kpid.clone())
+            }
         }
     }
 
     pub fn map_inbound_promise(&mut self, kpid: KernelPromiseID) -> VatPromiseID {
-        let karg: KernelArgSlot = kpid.into();
-        if let Some(varg) = self.inbound.get(&karg) {
-            use VatArgSlot::*;
-            match varg {
-                Import(..) | Export(..) => panic!(),
-                Promise(vpid) => vpid.clone(),
-            }
+        if let Some(vpid) = self.inbound_promises.get(&kpid) {
+            vpid.clone()
         } else {
-            let vpid = VatPromiseID(4);
-            let varg = VatArgSlot::Promise(vpid.clone());
-            self.inbound.insert(karg.clone(), varg.clone());
-            self.outbound.insert(varg, karg);
+            let vpid = VatPromiseID(4); // TODO allocate
+            self.inbound_promises.insert(kpid.clone(), vpid.clone());
+            self.outbound_promises.insert(vpid.clone(), kpid);
             vpid
         }
     }
@@ -118,11 +119,9 @@ impl Kernel {
         for_id: VatImportID,
         to: KernelExport,
     ) {
-        let vslot = VatArgSlot::Import(for_id);
-        let kslot = KernelArgSlot::Export(to);
         let clist = &mut self.vats.get_mut(&for_vat).unwrap().clist;
-        clist.inbound.insert(kslot.clone(), vslot.clone());
-        clist.outbound.insert(vslot, kslot);
+        clist.inbound_imports.insert(to.clone(), for_id.clone());
+        clist.outbound_imports.insert(for_id, to);
     }
 
     fn allocate_promise_resolver_pair(&self) -> (KernelPromiseID, KernelResolverID) {

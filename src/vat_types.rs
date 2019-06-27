@@ -39,6 +39,18 @@ impl fmt::Display for VatSendTarget {
     }
 }
 
+impl From<VatImportID> for VatSendTarget {
+    fn from(target: VatImportID) -> VatSendTarget {
+        VatSendTarget::Import(target)
+    }
+}
+
+impl From<VatPromiseID> for VatSendTarget {
+    fn from(target: VatPromiseID) -> VatSendTarget {
+        VatSendTarget::Promise(target)
+    }
+}
+
 #[derive(Debug, Eq, PartialEq, Hash, Clone)]
 pub enum VatArgSlot {
     Import(VatImportID),

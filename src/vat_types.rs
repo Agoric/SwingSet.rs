@@ -1,6 +1,6 @@
 use std::fmt;
 
-#[derive(Debug, Eq, PartialEq, Hash, Clone)]
+#[derive(Debug, Eq, PartialEq, Hash, Copy, Clone)]
 pub struct VatPromiseID(pub u32);
 impl fmt::Display for VatPromiseID {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
@@ -8,7 +8,7 @@ impl fmt::Display for VatPromiseID {
     }
 }
 
-#[derive(Debug, Eq, PartialEq, Hash, Clone)]
+#[derive(Debug, Eq, PartialEq, Hash, Copy, Clone)]
 pub struct VatExportID(pub u32);
 impl fmt::Display for VatExportID {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
@@ -16,7 +16,7 @@ impl fmt::Display for VatExportID {
     }
 }
 
-#[derive(Debug, Eq, PartialEq, Hash, Clone)]
+#[derive(Debug, Eq, PartialEq, Hash, Copy, Clone)]
 pub struct VatImportID(pub u32);
 impl fmt::Display for VatImportID {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
@@ -24,7 +24,7 @@ impl fmt::Display for VatImportID {
     }
 }
 
-#[derive(Debug, Eq, PartialEq, Hash, Clone)]
+#[derive(Debug, Eq, PartialEq, Hash, Copy, Clone)]
 pub enum VatSendTarget {
     Import(VatImportID),
     Promise(VatPromiseID),
@@ -51,7 +51,7 @@ impl From<VatPromiseID> for VatSendTarget {
     }
 }
 
-#[derive(Debug, Eq, PartialEq, Hash, Clone)]
+#[derive(Debug, Eq, PartialEq, Hash, Copy, Clone)]
 pub enum VatArgSlot {
     Import(VatImportID),
     Export(VatExportID),

@@ -3,27 +3,27 @@ use std::fmt;
 #[derive(PartialEq, Eq, Debug, Hash)]
 pub struct VatName(pub String);
 
-#[derive(PartialEq, Eq, Debug, Hash, Clone, Copy)]
+#[derive(PartialEq, Eq, Debug, Hash, Copy, Clone)]
 pub struct VatID(pub u32);
 
-#[derive(Debug, Eq, PartialEq, Hash, Clone)]
+#[derive(Debug, Eq, PartialEq, Hash, Copy, Clone)]
 pub struct KernelExportID(pub u32);
 
 // these two refer to the same object
-#[derive(Debug, Eq, PartialEq, Hash, Clone)]
+#[derive(Debug, Eq, PartialEq, Hash, Copy, Clone)]
 pub(crate) struct KernelPromiseID(pub u32);
 #[derive(Debug, Eq, PartialEq, Hash)]
 pub(crate) struct KernelResolverID(pub u32);
 
 /// "KernelExport" is the kernel's representation of a pass-by-presence
 /// object that has been exported by some Vat
-#[derive(Debug, Eq, PartialEq, Hash, Clone)]
+#[derive(Debug, Eq, PartialEq, Hash, Copy, Clone)]
 pub(crate) struct KernelExport(pub VatID, pub KernelExportID);
 
 /// "KernelTarget" is the kernel's representation of something which can be
 /// the target of a message send: either a KernelExport or a KernelPromise.
 /// This happens to be the same type as KernelArgSlot.
-#[derive(Debug, Eq, PartialEq, Hash, Clone)]
+#[derive(Debug, Eq, PartialEq, Hash, Copy, Clone)]
 pub(crate) enum KernelTarget {
     Export(KernelExport),
     Promise(KernelPromiseID),
@@ -31,7 +31,7 @@ pub(crate) enum KernelTarget {
 
 /// "KernelArgSlot" is the kernel's representation of something which can be
 /// an argument of a syscall.send or dispatch.deliver (or other methods).
-#[derive(Debug, Eq, PartialEq, Hash, Clone)]
+#[derive(Debug, Eq, PartialEq, Hash, Copy, Clone)]
 pub(crate) enum KernelArgSlot {
     Export(KernelExport),
     Promise(KernelPromiseID),

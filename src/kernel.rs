@@ -31,7 +31,7 @@ impl PendingDelivery {
     }
 }
 
-pub(crate) trait CListVatEntry: Eq + Hash + Clone {
+pub(crate) trait CListVatEntry: Eq + Hash + Copy {
     fn new(index: u32) -> Self;
 }
 impl CListVatEntry for VatImportID {
@@ -45,7 +45,7 @@ impl CListVatEntry for VatPromiseID {
     }
 }
 
-pub(crate) trait CListKernelEntry: Eq + Hash + Clone {}
+pub(crate) trait CListKernelEntry: Eq + Hash + Copy {}
 impl CListKernelEntry for KernelExport {}
 impl CListKernelEntry for KernelPromiseID {}
 
@@ -72,23 +72,21 @@ impl<KT: CListKernelEntry, VT: CListVatEntry> CList<KT, VT> {
     /// vat objects being sent outbound (out of the vat and into the kernel)
     /// must already exist in the clist: this is how we confine vats to only
     /// use previously-granted authorities
-    pub fn map_outbound(&self, vat_object: &VT) -> KT {
-        (*self.outbound.get(&vat_object).unwrap()).clone()
+    pub fn map_outbound(&self, vat_object: VT) -> KT {
+        *self.outbound.get(&vat_object).unwrap()
     }
 
     /// kernel objects being sent inbound (from the kernel, into the vat)
     /// might already exist, or they might need to allocate new vat-side
     /// identifiers
-    pub fn map_inbound(&mut self, kernel_object: &KT) -> VT {
+    pub fn map_inbound(&mut self, kernel_object: KT) -> VT {
         if let Some(vat_object) = self.inbound.get(&kernel_object) {
-            vat_object.clone()
+            *vat_object
         } else {
             let vat_object = VT::new(self.next_index);
             self.next_index += 1;
-            self.inbound
-                .insert(kernel_object.clone(), vat_object.clone());
-            self.outbound
-                .insert(vat_object.clone(), kernel_object.clone());
+            self.inbound.insert(kernel_object, vat_object);
+            self.outbound.insert(vat_object, kernel_object);
             vat_object
         }
     }
@@ -159,10 +157,10 @@ impl Kernel {
         to_id: u32,
     ) {
         let for_vat_id = self.vat_names.get(&for_vat).unwrap();
-        let to_vat_id = self.vat_names.get(&to_vat).unwrap();
-        let to = KernelExport(*to_vat_id, KernelExportID(to_id));
+        let to_vat_id = *self.vat_names.get(&to_vat).unwrap();
+        let to = KernelExport(to_vat_id, KernelExportID(to_id));
         let clist = &mut self.vat_data.get_mut(for_vat_id).unwrap().import_clist;
-        clist.inbound.insert(to.clone(), VatImportID(for_id));
+        clist.inbound.insert(to, VatImportID(for_id));
         clist.outbound.insert(VatImportID(for_id), to);
     }
 
@@ -174,10 +172,10 @@ impl Kernel {
     }
 
     pub fn push(&mut self, name: &VatName, export: KernelExportID, method: String) {
-        let vat_id = self.vat_names.get(&name).unwrap();
+        let vat_id = *self.vat_names.get(&name).unwrap();
         let (_pid, rid) = self.allocate_promise_resolver_pair();
         let pd = PendingDelivery {
-            target: KernelTarget::Export(KernelExport(*vat_id, export)),
+            target: KernelTarget::Export(KernelExport(vat_id, export)),
             method,
             args: 0,
             resolver: rid,

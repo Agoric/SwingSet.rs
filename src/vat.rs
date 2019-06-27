@@ -19,12 +19,12 @@ impl<'a> VatSyscall<'a> {
     fn map_outbound_target(&self, vtarget: VatSendTarget) -> KernelTarget {
         match vtarget {
             VatSendTarget::Import(viid) => {
-                let ke = self.vm.vat_data.import_clist.map_outbound(&viid);
-                KernelTarget::Export(ke.clone())
+                let ke = self.vm.vat_data.import_clist.map_outbound(viid);
+                KernelTarget::Export(ke)
             }
             VatSendTarget::Promise(vpid) => {
-                let kpid = self.vm.vat_data.promise_clist.map_outbound(&vpid);
-                KernelTarget::Promise(kpid.clone())
+                let kpid = self.vm.vat_data.promise_clist.map_outbound(vpid);
+                KernelTarget::Promise(kpid)
             }
         }
     }
@@ -42,7 +42,7 @@ impl<'a> Syscall for VatSyscall<'a> {
         let (kpid, krid) = (self.vm.allocate_promise_resolver_pair)();
         let pd = PendingDelivery::new(ktarget, name, 0, krid);
         self.vm.run_queue.0.push_back(pd);
-        self.vm.vat_data.promise_clist.map_inbound(&kpid)
+        self.vm.vat_data.promise_clist.map_inbound(kpid)
     }
 }
 

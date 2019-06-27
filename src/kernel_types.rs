@@ -1,7 +1,10 @@
 use std::fmt;
 
-#[derive(PartialEq, Eq, Debug, Hash, Clone)]
+#[derive(PartialEq, Eq, Debug, Hash)]
 pub struct VatName(pub String);
+
+#[derive(PartialEq, Eq, Debug, Hash, Clone, Copy)]
+pub struct VatID(pub u32);
 
 #[derive(Debug, Eq, PartialEq, Hash, Clone)]
 pub struct KernelExportID(pub u32);
@@ -15,7 +18,7 @@ pub(crate) struct KernelResolverID(pub u32);
 /// "KernelExport" is the kernel's representation of a pass-by-presence
 /// object that has been exported by some Vat
 #[derive(Debug, Eq, PartialEq, Hash, Clone)]
-pub(crate) struct KernelExport(pub VatName, pub KernelExportID);
+pub(crate) struct KernelExport(pub VatID, pub KernelExportID);
 
 /// "KernelTarget" is the kernel's representation of something which can be
 /// the target of a message send: either a KernelExport or a KernelPromise.
@@ -36,7 +39,12 @@ pub(crate) enum KernelArgSlot {
 
 impl fmt::Display for VatName {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-        write!(f, "{}", self.0)
+        write!(f, "vat-{}", self.0)
+    }
+}
+impl fmt::Display for VatID {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        write!(f, "vat{}", self.0)
     }
 }
 impl fmt::Display for KernelExportID {

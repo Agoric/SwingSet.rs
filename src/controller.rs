@@ -1,8 +1,7 @@
 //use std::fmt::Debug;
 use super::config::Config;
 use super::kernel::Kernel;
-use super::kernel_types::{KernelExport, KernelExportID, VatName};
-use super::vat_types::VatImportID;
+use super::kernel_types::{KernelExportID, VatName};
 
 //#[derive(Debug)]
 pub struct Controller {
@@ -22,11 +21,7 @@ impl Controller {
         to_vat: &VatName,
         to_id: u32,
     ) {
-        self.kernel.add_import(
-            for_vat,
-            VatImportID(for_id),
-            KernelExport(to_vat.clone(), KernelExportID(to_id)),
-        );
+        self.kernel.add_import(for_vat, for_id, to_vat, to_id);
     }
 
     pub fn start(&mut self) {

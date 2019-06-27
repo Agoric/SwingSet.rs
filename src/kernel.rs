@@ -1,5 +1,5 @@
 use super::kernel_types::{
-    KernelExport, KernelExportID, KernelPromiseID, KernelResolverID, KernelTarget,
+    KernelExport, KernelExportID, KernelPromiseID, KernelResolverID, KernelTarget, VatID,
     VatName,
 };
 use super::vat::{Dispatch, VatManager, VatSyscall};
@@ -104,27 +104,32 @@ pub struct RunQueue(pub VecDeque<PendingDelivery>);
 
 //#[derive(Debug)]
 pub struct Kernel {
-    vat_dispatch: HashMap<VatName, Box<dyn Dispatch>>,
-    vat_data: HashMap<VatName, VatData>,
+    vat_names: HashMap<VatName, VatID>,
+    vat_dispatch: HashMap<VatID, Box<dyn Dispatch>>,
+    vat_data: HashMap<VatID, VatData>,
     run_queue: RunQueue,
     next_promise_resolver_id: Cell<u32>,
 }
 
 impl Kernel {
     pub fn new(vats: HashMap<VatName, Box<dyn Dispatch>>) -> Self {
-        let mut vat_dispatch = <HashMap<VatName, Box<dyn Dispatch>>>::new();
-        let mut vat_data = <HashMap<VatName, VatData>>::new();
+        let mut vat_names = <HashMap<VatName, VatID>>::new();
+        let mut vat_dispatch = <HashMap<VatID, Box<dyn Dispatch>>>::new();
+        let mut vat_data = <HashMap<VatID, VatData>>::new();
+        let mut id = 0;
         for (key, dispatch) in vats {
-            vat_dispatch.insert(VatName(key.to_string()), dispatch);
-            vat_data.insert(
-                VatName(key.to_string()),
-                VatData {
-                    import_clist: CList::new(),
-                    promise_clist: CList::new(),
-                },
-            );
+            let vat_id = VatID(id);
+            id += 1;
+            vat_names.insert(VatName(key.0.clone()), vat_id);
+            vat_dispatch.insert(vat_id, dispatch);
+            let vd = VatData {
+                import_clist: CList::new(),
+                promise_clist: CList::new(),
+            };
+            vat_data.insert(vat_id, vd);
         }
         Kernel {
+            vat_names,
             vat_dispatch,
             vat_data,
             run_queue: RunQueue::default(),
@@ -132,6 +137,7 @@ impl Kernel {
         }
     }
 
+    /*
     pub fn _add_vat(&mut self, name: &VatName, dispatch: impl Dispatch + 'static) {
         self.vat_dispatch
             .insert(VatName(name.0.clone()), Box::new(dispatch));
@@ -143,16 +149,21 @@ impl Kernel {
             },
         );
     }
+    */
 
     pub(crate) fn add_import(
         &mut self,
         for_vat: &VatName,
-        for_id: VatImportID,
-        to: KernelExport,
+        for_id: u32,
+        to_vat: &VatName,
+        to_id: u32,
     ) {
-        let clist = &mut self.vat_data.get_mut(&for_vat).unwrap().import_clist;
-        clist.inbound.insert(to.clone(), for_id.clone());
-        clist.outbound.insert(for_id, to);
+        let for_vat_id = self.vat_names.get(&for_vat).unwrap();
+        let to_vat_id = self.vat_names.get(&to_vat).unwrap();
+        let to = KernelExport(*to_vat_id, KernelExportID(to_id));
+        let clist = &mut self.vat_data.get_mut(for_vat_id).unwrap().import_clist;
+        clist.inbound.insert(to.clone(), VatImportID(for_id));
+        clist.outbound.insert(VatImportID(for_id), to);
     }
 
     fn allocate_promise_resolver_pair(&self) -> (KernelPromiseID, KernelResolverID) {
@@ -163,9 +174,10 @@ impl Kernel {
     }
 
     pub fn push(&mut self, name: &VatName, export: KernelExportID, method: String) {
+        let vat_id = self.vat_names.get(&name).unwrap();
         let (_pid, rid) = self.allocate_promise_resolver_pair();
         let pd = PendingDelivery {
-            target: KernelTarget::Export(KernelExport(VatName(name.0.clone()), export)),
+            target: KernelTarget::Export(KernelExport(*vat_id, export)),
             method,
             args: 0,
             resolver: rid,
@@ -173,12 +185,14 @@ impl Kernel {
         self.run_queue.0.push_back(pd);
     }
 
+    /// exports return home with the same index
     fn map_export_target(&self, id: KernelExportID) -> VatExportID {
         VatExportID(id.0)
     }
 
     fn _map_inbound(&mut self, _vn: &VatName, id: KernelExportID) -> VatExportID {
         // todo clist mapping
+        //let vat_id = self.vat_names.get(&vn).unwrap();
         VatExportID(id.0)
     }
 
@@ -186,12 +200,11 @@ impl Kernel {
         let t = pd.target;
         println!("process: {}.{}", t, pd.method);
         match t {
-            KernelTarget::Export(KernelExport(vn, kid)) => {
-                //let vid = self.map_inbound(&vn, kid);
+            KernelTarget::Export(KernelExport(vat_id, kid)) => {
                 let vid = self.map_export_target(kid);
-                let dispatch = self.vat_dispatch.get_mut(&vn).unwrap();
-                //let VatData{ clist, dispatch } = self.vats.get_mut(&vn).unwrap();
-                let mut vd = self.vat_data.get_mut(&vn).unwrap();
+                let dispatch = self.vat_dispatch.get_mut(&vat_id).unwrap();
+                //let VatData{ clist, dispatch } = self.vats.get_mut(&vat_id).unwrap();
+                let mut vd = self.vat_data.get_mut(&vat_id).unwrap();
                 let nprid = &self.next_promise_resolver_id;
                 let allocate_promise_resolver_pair = || {
                     let id = nprid.get();

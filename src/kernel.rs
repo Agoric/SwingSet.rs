@@ -4,7 +4,9 @@ use super::kernel_types::{
     KernelResolverID, KernelTarget, VatID, VatName,
 };
 use super::vat::{Dispatch, VatManager, VatSyscall};
-use super::vat_types::{VatArgSlot, VatExportID, VatImportID, VatMessage, VatPromiseID};
+use super::vat_types::{
+    VatArgSlot, VatCapData, VatExportID, VatImportID, VatMessage, VatPromiseID,
+};
 use std::cell::Cell;
 use std::collections::{HashMap, VecDeque};
 
@@ -174,12 +176,15 @@ impl Kernel {
                 let kmsg = pd.message;
                 let vmsg = VatMessage {
                     name: kmsg.name,
-                    body: kmsg.body,
-                    slots: kmsg
-                        .slots
-                        .into_iter()
-                        .map(|slot| vd.map_inbound_arg_slot(slot))
-                        .collect(),
+                    args: VatCapData {
+                        body: kmsg.args.body,
+                        slots: kmsg
+                            .args
+                            .slots
+                            .into_iter()
+                            .map(|slot| vd.map_inbound_arg_slot(slot))
+                            .collect(),
+                    },
                 };
 
                 //let VatData{ clist, dispatch } = self.vats.get_mut(&vat_id).unwrap();

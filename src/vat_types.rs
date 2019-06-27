@@ -79,17 +79,24 @@ impl From<VatSendTarget> for VatArgSlot {
 }
 
 #[derive(Debug)]
-pub struct VatMessage {
-    pub name: String,
+pub struct VatCapData {
     pub body: Vec<u8>,
     pub slots: Vec<VatArgSlot>,
+}
+
+#[derive(Debug)]
+pub struct VatMessage {
+    pub name: String,
+    pub args: VatCapData,
 }
 impl VatMessage {
     pub fn new(name: &str, body: &[u8], slots: Vec<VatArgSlot>) -> Self {
         VatMessage {
             name: name.to_string(),
-            body: body.to_vec(),
-            slots,
+            args: VatCapData {
+                body: body.to_vec(),
+                slots,
+            },
         }
     }
 }

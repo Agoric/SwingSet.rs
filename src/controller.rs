@@ -1,7 +1,7 @@
 //use std::fmt::Debug;
 use super::config::Config;
 use super::kernel::Kernel;
-use super::kernel_types::{KernelExportID, KernelMessage, VatName};
+use super::kernel_types::{KernelCapData, KernelExportID, KernelMessage, VatName};
 
 //#[derive(Debug)]
 pub struct Controller {
@@ -30,8 +30,10 @@ impl Controller {
             KernelExportID(0),
             KernelMessage {
                 name: "bootstrap".to_string(),
-                body: vec![],
-                slots: vec![],
+                args: KernelCapData {
+                    body: vec![],
+                    slots: vec![],
+                },
             },
         );
     }

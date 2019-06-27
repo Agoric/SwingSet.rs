@@ -1,6 +1,6 @@
 use super::{
-    Config, Controller, Dispatch, Syscall, VatExportID, VatImportID, VatMessage, VatName,
-    VatPromiseID, VatSendTarget,
+    Config, Controller, Dispatch, Syscall, VatCapData, VatExportID, VatImportID,
+    VatMessage, VatName, VatPromiseID, VatSendTarget,
 };
 use std::cell::RefCell;
 use std::rc::Rc;
@@ -21,8 +21,8 @@ impl Dispatch for Vat1Dispatch {
             VatExportID(0) => {
                 println!(" deliver[0]");
                 assert_eq!(message.name, "bootstrap");
-                assert_eq!(message.body, b"");
-                assert_eq!(message.slots, vec![]);
+                assert_eq!(message.args.body, b"");
+                assert_eq!(message.args.slots, vec![]);
                 self.log.borrow_mut().push(1);
                 let t = VatSendTarget::Import(VatImportID(1));
                 let vmsg = VatMessage::new("foo", b"body", vec![]);
@@ -32,17 +32,19 @@ impl Dispatch for Vat1Dispatch {
             VatExportID(2) => {
                 println!(" deliver[2]");
                 assert_eq!(message.name, "foo");
-                assert_eq!(message.body, b"body");
-                assert_eq!(message.slots, vec![]);
+                assert_eq!(message.args.body, b"body");
+                assert_eq!(message.args.slots, vec![]);
                 self.log.borrow_mut().push(2);
             }
             _ => panic!("unknown target {}", target),
         };
     }
 
-    fn notify_resolve_to_target(&mut self, id: VatPromiseID, target: u8) {
+    fn notify_fulfill_to_target(&mut self, id: VatPromiseID, target: VatSendTarget) {
         println!("Vat1.notifyResolveToTarget {} {}", id, target);
     }
+    fn notify_fulfill_to_data(&mut self, _id: VatPromiseID, _data: VatCapData) {}
+    fn notify_reject(&mut self, _id: VatPromiseID, _data: VatCapData) {}
 }
 
 #[test]

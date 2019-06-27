@@ -38,10 +38,15 @@ pub(crate) enum KernelArgSlot {
 }
 
 #[derive(Debug)]
-pub(crate) struct KernelMessage {
-    pub name: String,
+pub struct KernelCapData {
     pub body: Vec<u8>,
     pub(crate) slots: Vec<KernelArgSlot>,
+}
+
+#[derive(Debug)]
+pub(crate) struct KernelMessage {
+    pub name: String,
+    pub(crate) args: KernelCapData,
 }
 
 impl fmt::Display for VatName {

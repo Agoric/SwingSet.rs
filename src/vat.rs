@@ -1,10 +1,10 @@
 use super::kernel::{PendingDelivery, RunQueue, VatData};
 use super::kernel_types::{
-    KernelArgSlot, KernelExport, KernelExportID, KernelMessage, KernelPromiseID,
-    KernelResolverID, KernelTarget, VatID,
+    KernelArgSlot, KernelCapData, KernelExport, KernelExportID, KernelMessage,
+    KernelPromiseID, KernelResolverID, KernelTarget, VatID,
 };
 use super::vat_types::{
-    VatArgSlot, VatExportID, VatMessage, VatPromiseID, VatSendTarget,
+    VatArgSlot, VatCapData, VatExportID, VatMessage, VatPromiseID, VatSendTarget,
 };
 
 pub(crate) struct VatManager<'a> {
@@ -64,12 +64,15 @@ impl<'a> Syscall for VatSyscall<'a> {
         let (kpid, krid) = (self.vm.allocate_promise_resolver_pair)();
         let kmsg = KernelMessage {
             name: vmsg.name.to_string(),
-            body: vmsg.body,
-            slots: vmsg
-                .slots
-                .into_iter()
-                .map(|slot| self.map_outbound_arg_slot(slot))
-                .collect(),
+            args: KernelCapData {
+                body: vmsg.args.body,
+                slots: vmsg
+                    .args
+                    .slots
+                    .into_iter()
+                    .map(|slot| self.map_outbound_arg_slot(slot))
+                    .collect(),
+            },
         };
         println!(" kt: {}.{}", ktarget, kmsg.name);
         let pd = PendingDelivery::new(ktarget, kmsg, krid);
@@ -78,6 +81,8 @@ impl<'a> Syscall for VatSyscall<'a> {
     }
 }
 
+// TODO: we need a name for the pass-by-presence type. "target"? "export"?
+
 pub trait Dispatch {
     fn deliver(
         &mut self,
@@ -85,5 +90,7 @@ pub trait Dispatch {
         target: VatExportID,
         message: VatMessage,
     ) -> ();
-    fn notify_resolve_to_target(&mut self, id: VatPromiseID, target: u8);
+    fn notify_fulfill_to_target(&mut self, id: VatPromiseID, target: VatSendTarget);
+    fn notify_fulfill_to_data(&mut self, id: VatPromiseID, data: VatCapData);
+    fn notify_reject(&mut self, id: VatPromiseID, data: VatCapData);
 }

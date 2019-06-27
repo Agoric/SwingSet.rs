@@ -12,4 +12,4 @@ pub use config::Config;
 pub use controller::Controller;
 pub use kernel_types::VatName;
 pub use vat::{Dispatch, Syscall};
-pub use vat_types::{VatExportID, VatImportID, VatPromiseID, VatSendTarget};
+pub use vat_types::{VatExportID, VatImportID, VatMessage, VatPromiseID, VatSendTarget};

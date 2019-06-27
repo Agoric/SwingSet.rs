@@ -1,8 +1,14 @@
 use super::kernel::{PendingDelivery, RunQueue, VatData};
-use super::kernel_types::{KernelPromiseID, KernelResolverID, KernelTarget};
-use super::vat_types::{VatExportID, VatPromiseID, VatSendTarget};
+use super::kernel_types::{
+    KernelArgSlot, KernelExport, KernelExportID, KernelMessage, KernelPromiseID,
+    KernelResolverID, KernelTarget, VatID,
+};
+use super::vat_types::{
+    VatArgSlot, VatExportID, VatMessage, VatPromiseID, VatSendTarget,
+};
 
 pub(crate) struct VatManager<'a> {
+    pub vat_id: VatID,
     pub run_queue: &'a mut RunQueue,
     pub vat_data: &'a mut VatData,
     pub allocate_promise_resolver_pair: &'a Fn() -> (KernelPromiseID, KernelResolverID),
@@ -28,19 +34,45 @@ impl<'a> VatSyscall<'a> {
             }
         }
     }
+
+    fn map_outbound_arg_slot(&self, varg: VatArgSlot) -> KernelArgSlot {
+        match varg {
+            VatArgSlot::Import(viid) => {
+                let ke = self.vm.vat_data.import_clist.map_outbound(viid);
+                KernelArgSlot::Export(ke)
+            }
+            VatArgSlot::Export(veid) => {
+                let keid = KernelExportID(veid.0);
+                KernelArgSlot::Export(KernelExport(self.vm.vat_id, keid))
+            }
+            VatArgSlot::Promise(vpid) => {
+                let kpid = self.vm.vat_data.promise_clist.map_outbound(vpid);
+                KernelArgSlot::Promise(kpid)
+            }
+        }
+    }
 }
 
 pub trait Syscall {
-    fn send(&mut self, target: VatSendTarget, name: &str) -> VatPromiseID;
+    fn send(&mut self, target: VatSendTarget, vmsg: VatMessage) -> VatPromiseID;
 }
 
 impl<'a> Syscall for VatSyscall<'a> {
-    fn send(&mut self, vtarget: VatSendTarget, name: &str) -> VatPromiseID {
-        println!("syscall.send {}.{}", vtarget, name);
+    fn send(&mut self, vtarget: VatSendTarget, vmsg: VatMessage) -> VatPromiseID {
+        println!("syscall.send {}.{}", vtarget, vmsg.name);
         let ktarget = self.map_outbound_target(vtarget);
-        println!(" kt: {}.{}", ktarget, name);
         let (kpid, krid) = (self.vm.allocate_promise_resolver_pair)();
-        let pd = PendingDelivery::new(ktarget, name, 0, krid);
+        let kmsg = KernelMessage {
+            name: vmsg.name.to_string(),
+            body: vmsg.body,
+            slots: vmsg
+                .slots
+                .into_iter()
+                .map(|slot| self.map_outbound_arg_slot(slot))
+                .collect(),
+        };
+        println!(" kt: {}.{}", ktarget, kmsg.name);
+        let pd = PendingDelivery::new(ktarget, kmsg, krid);
         self.vm.run_queue.0.push_back(pd);
         self.vm.vat_data.promise_clist.map_inbound(kpid)
     }

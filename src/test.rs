@@ -1,5 +1,5 @@
 use super::{
-    Config, Controller, Dispatch, Syscall, VatExportID, VatImportID, VatName,
+    Config, Controller, Dispatch, Syscall, VatExportID, VatImportID, VatMessage, VatName,
     VatPromiseID, VatSendTarget,
 };
 use std::cell::RefCell;
@@ -17,7 +17,12 @@ impl Dispatch for Vat1Dispatch {
                 println!(" deliver[0]");
                 self.log.borrow_mut().push(1);
                 let t = VatSendTarget::Import(VatImportID(1));
-                let p = syscall.send(t, "foo");
+                let vmsg = VatMessage {
+                    name: "foo".to_string(),
+                    body: vec![],
+                    slots: vec![],
+                };
+                let p = syscall.send(t, vmsg);
                 println!(" got promise {}", p);
             }
             VatExportID(2) => {

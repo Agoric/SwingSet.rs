@@ -1,7 +1,7 @@
 //use std::fmt::Debug;
 use super::config::Config;
 use super::kernel::Kernel;
-use super::kernel_types::{KernelExportID, VatName};
+use super::kernel_types::{KernelExportID, KernelMessage, VatName};
 
 //#[derive(Debug)]
 pub struct Controller {
@@ -28,7 +28,11 @@ impl Controller {
         self.kernel.push(
             &VatName("bootstrap".to_string()),
             KernelExportID(0),
-            "bootstrap".to_string(),
+            KernelMessage {
+                name: "bootstrap".to_string(),
+                body: vec![],
+                slots: vec![],
+            },
         );
     }
 

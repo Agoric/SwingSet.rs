@@ -37,6 +37,13 @@ pub(crate) enum KernelArgSlot {
     Promise(KernelPromiseID),
 }
 
+#[derive(Debug)]
+pub(crate) struct KernelMessage {
+    pub name: String,
+    pub body: Vec<u8>,
+    pub(crate) slots: Vec<KernelArgSlot>,
+}
+
 impl fmt::Display for VatName {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         write!(f, "vat-{}", self.0)

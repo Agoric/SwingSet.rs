@@ -77,3 +77,10 @@ impl From<VatSendTarget> for VatArgSlot {
         }
     }
 }
+
+#[derive(Debug)]
+pub struct VatMessage {
+    pub name: String,
+    pub body: Vec<u8>,
+    pub slots: Vec<VatArgSlot>,
+}

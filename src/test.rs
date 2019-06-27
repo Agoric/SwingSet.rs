@@ -10,23 +10,30 @@ struct Vat1Dispatch {
     log: Rc<RefCell<Vec<u32>>>,
 }
 impl Dispatch for Vat1Dispatch {
-    fn deliver(&mut self, syscall: &mut dyn Syscall, target: VatExportID) -> () {
+    fn deliver(
+        &mut self,
+        syscall: &mut dyn Syscall,
+        target: VatExportID,
+        message: VatMessage,
+    ) -> () {
         println!("Vat1.deliver {}", target);
         match target {
             VatExportID(0) => {
                 println!(" deliver[0]");
+                assert_eq!(message.name, "bootstrap");
+                assert_eq!(message.body, b"");
+                assert_eq!(message.slots, vec![]);
                 self.log.borrow_mut().push(1);
                 let t = VatSendTarget::Import(VatImportID(1));
-                let vmsg = VatMessage {
-                    name: "foo".to_string(),
-                    body: vec![],
-                    slots: vec![],
-                };
+                let vmsg = VatMessage::new("foo", b"body", vec![]);
                 let p = syscall.send(t, vmsg);
                 println!(" got promise {}", p);
             }
             VatExportID(2) => {
                 println!(" deliver[2]");
+                assert_eq!(message.name, "foo");
+                assert_eq!(message.body, b"body");
+                assert_eq!(message.slots, vec![]);
                 self.log.borrow_mut().push(2);
             }
             _ => panic!("unknown target {}", target),

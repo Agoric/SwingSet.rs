@@ -1,10 +1,10 @@
 use super::clist::{CList, CListKernelEntry, CListVatEntry};
 use super::kernel_types::{
-    KernelExport, KernelExportID, KernelMessage, KernelPromiseID, KernelResolverID,
-    KernelTarget, VatID, VatName,
+    KernelArgSlot, KernelExport, KernelExportID, KernelMessage, KernelPromiseID,
+    KernelResolverID, KernelTarget, VatID, VatName,
 };
 use super::vat::{Dispatch, VatManager, VatSyscall};
-use super::vat_types::{VatExportID, VatImportID, VatPromiseID};
+use super::vat_types::{VatArgSlot, VatExportID, VatImportID, VatMessage, VatPromiseID};
 use std::cell::Cell;
 use std::collections::{HashMap, VecDeque};
 
@@ -42,8 +42,29 @@ impl PendingDelivery {
 }
 
 pub(crate) struct VatData {
+    vat_id: VatID,
     pub(crate) import_clist: CList<KernelExport, VatImportID>,
     pub(crate) promise_clist: CList<KernelPromiseID, VatPromiseID>,
+}
+impl VatData {
+    pub fn map_inbound_arg_slot(&mut self, slot: KernelArgSlot) -> VatArgSlot {
+        match slot {
+            KernelArgSlot::Export(ke) => {
+                let vat_id: VatID = ke.0;
+                if vat_id == self.vat_id {
+                    // the vat's own export, returning home
+                    let keid: KernelExportID = ke.1;
+                    VatArgSlot::Import(VatImportID(keid.0))
+                } else {
+                    // another vat's export, get/allocate in clist
+                    VatArgSlot::Import(self.import_clist.map_inbound(ke))
+                }
+            }
+            KernelArgSlot::Promise(kp) => {
+                VatArgSlot::Promise(self.promise_clist.map_inbound(kp))
+            }
+        }
+    }
 }
 
 #[derive(Debug, Default)]
@@ -70,6 +91,7 @@ impl Kernel {
             vat_names.insert(VatName(key.0.clone()), vat_id);
             vat_dispatch.insert(vat_id, dispatch);
             let vd = VatData {
+                vat_id,
                 import_clist: CList::new(),
                 promise_clist: CList::new(),
             };
@@ -138,7 +160,7 @@ impl Kernel {
     }
 
     /// exports return home with the same index
-    fn map_export_target(&self, id: KernelExportID) -> VatExportID {
+    fn map_inbound_target(&self, id: KernelExportID) -> VatExportID {
         VatExportID(id.0)
     }
 
@@ -147,10 +169,20 @@ impl Kernel {
         println!("process: {}.{}", t, pd.message.name);
         match t {
             KernelTarget::Export(KernelExport(vat_id, kid)) => {
-                let veid = self.map_export_target(kid);
-                let dispatch = self.vat_dispatch.get_mut(&vat_id).unwrap();
-                //let VatData{ clist, dispatch } = self.vats.get_mut(&vat_id).unwrap();
+                let veid = self.map_inbound_target(kid);
                 let mut vd = self.vat_data.get_mut(&vat_id).unwrap();
+                let kmsg = pd.message;
+                let vmsg = VatMessage {
+                    name: kmsg.name,
+                    body: kmsg.body,
+                    slots: kmsg
+                        .slots
+                        .into_iter()
+                        .map(|slot| vd.map_inbound_arg_slot(slot))
+                        .collect(),
+                };
+
+                //let VatData{ clist, dispatch } = self.vats.get_mut(&vat_id).unwrap();
                 let nprid = &self.next_promise_resolver_id;
                 let allocate_promise_resolver_pair = || {
                     let id = nprid.get();
@@ -165,7 +197,8 @@ impl Kernel {
                     allocate_promise_resolver_pair: &allocate_promise_resolver_pair,
                 };
                 let mut syscall = VatSyscall::new(vm);
-                dispatch.deliver(&mut syscall, veid);
+                let dispatch = self.vat_dispatch.get_mut(&vat_id).unwrap();
+                dispatch.deliver(&mut syscall, veid, vmsg);
             }
             //KernelTarget::Promise(_pid) => {}
             _ => panic!(),

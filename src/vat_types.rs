@@ -84,3 +84,12 @@ pub struct VatMessage {
     pub body: Vec<u8>,
     pub slots: Vec<VatArgSlot>,
 }
+impl VatMessage {
+    pub fn new(name: &str, body: &[u8], slots: Vec<VatArgSlot>) -> Self {
+        VatMessage {
+            name: name.to_string(),
+            body: body.to_vec(),
+            slots,
+        }
+    }
+}

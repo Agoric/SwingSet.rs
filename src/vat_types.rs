@@ -1,6 +1,6 @@
 use std::fmt;
 
-#[derive(Debug)]
+#[derive(Debug, Eq, PartialEq, Hash, Clone)]
 pub struct VatPromiseID(pub u32);
 impl fmt::Display for VatPromiseID {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
@@ -8,7 +8,7 @@ impl fmt::Display for VatPromiseID {
     }
 }
 
-#[derive(Debug)]
+#[derive(Debug, Eq, PartialEq, Hash, Clone)]
 pub struct VatExportID(pub u32);
 impl fmt::Display for VatExportID {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
@@ -16,7 +16,7 @@ impl fmt::Display for VatExportID {
     }
 }
 
-#[derive(Debug)]
+#[derive(Debug, Eq, PartialEq, Hash, Clone)]
 pub struct VatImportID(pub u32);
 impl fmt::Display for VatImportID {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
@@ -24,15 +24,44 @@ impl fmt::Display for VatImportID {
     }
 }
 
+#[derive(Debug, Eq, PartialEq, Hash, Clone)]
 pub enum VatSendTarget {
     Import(VatImportID),
     Promise(VatPromiseID),
 }
 impl fmt::Display for VatSendTarget {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        use VatSendTarget::*;
         match self {
-            VatSendTarget::Import(id) => write!(f, "VatSendTarget({})", id),
-            VatSendTarget::Promise(id) => write!(f, "VatSendTarget(Promise-{})", id),
+            Import(id) => write!(f, "VatSendTarget({})", id),
+            Promise(id) => write!(f, "VatSendTarget(Promise-{})", id),
+        }
+    }
+}
+
+#[derive(Debug, Eq, PartialEq, Hash, Clone)]
+pub enum VatArgSlot {
+    Import(VatImportID),
+    Export(VatExportID),
+    Promise(VatPromiseID),
+}
+
+impl fmt::Display for VatArgSlot {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        use VatArgSlot::*;
+        match self {
+            Import(id) => write!(f, "varg-import-{}", id),
+            Export(id) => write!(f, "varg-export-{}", id),
+            Promise(id) => write!(f, "varg-promise-{}", id),
+        }
+    }
+}
+
+impl From<VatSendTarget> for VatArgSlot {
+    fn from(target: VatSendTarget) -> VatArgSlot {
+        match target {
+            VatSendTarget::Import(id) => VatArgSlot::Import(id),
+            VatSendTarget::Promise(id) => VatArgSlot::Promise(id),
         }
     }
 }

@@ -27,10 +27,14 @@ impl Dispatch for Vat1Dispatch {
 fn test_build() {
     let mut cfg = Config::new();
     let vat1 = Vat1Dispatch {};
-    cfg.add_vat(&VatName("bootstrap".to_string()), vat1);
+    let vn = VatName("bootstrap".to_string());
+    cfg.add_vat(&vn, vat1);
     let mut c = Controller::new(cfg);
+    c.add_import(&vn, 1, &vn, 2);
     //println!("controller: {:?}", c);
     println!("controller created");
     c.start();
+    c.dump();
     c.step();
+    c.dump();
 }

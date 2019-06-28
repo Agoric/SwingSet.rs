@@ -1,4 +1,3 @@
-use super::syscall::Syscall;
 use super::vat_types::{
     VatCapData, VatExportID, VatMessage, VatPromiseID, VatResolverID, VatSendTarget,
 };
@@ -8,7 +7,6 @@ use super::vat_types::{
 pub trait Dispatch {
     fn deliver(
         &mut self,
-        syscall: &mut dyn Syscall,
         target: VatExportID,
         message: VatMessage,
         resolver: Option<VatResolverID>,

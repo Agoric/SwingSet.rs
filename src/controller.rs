@@ -10,7 +10,7 @@ pub struct Controller {
 
 impl Controller {
     pub fn new(cfg: Config) -> Self {
-        let kernel = Kernel::new(cfg.vats);
+        let kernel = Kernel::new(cfg);
         Controller { kernel }
     }
 

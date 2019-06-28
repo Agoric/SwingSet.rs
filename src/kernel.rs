@@ -1,16 +1,18 @@
 use super::clist::{CList, CListKernelEntry, CListVatEntry};
+use super::config::Config;
 use super::dispatch::Dispatch;
 use super::kernel_types::{
     KernelArgSlot, KernelExport, KernelExportID, KernelMessage, KernelPromiseID,
     KernelResolverID, KernelTarget, VatID, VatName,
 };
-use super::vat::{VatManager, VatSyscall};
+use super::vat::VatSyscall;
 use super::vat_types::{
     VatArgSlot, VatCapData, VatExportID, VatImportID, VatMessage, VatPromiseID,
     VatResolverID,
 };
-use std::cell::Cell;
+use std::cell::RefCell;
 use std::collections::{HashMap, VecDeque};
+use std::rc::Rc;
 
 impl CListVatEntry for VatImportID {
     fn new(index: u32) -> Self {
@@ -88,47 +90,47 @@ impl VatData {
 #[derive(Debug, Default)]
 pub struct RunQueue(pub VecDeque<PendingDelivery>);
 
-pub struct KernelData {
-    vat_names: HashMap<VatName, VatID>,
-    vat_dispatch: HashMap<VatID, Box<dyn Dispatch>>,
-    vat_data: HashMap<VatID, VatData>,
-    run_queue: RunQueue,
-    next_promise_resolver_id: Cell<u32>,
+pub(crate) struct KernelData {
+    pub(crate) vat_names: HashMap<VatName, VatID>,
+    pub(crate) vat_data: HashMap<VatID, VatData>,
+    pub(crate) run_queue: RunQueue,
+    pub(crate) next_promise_resolver_id: u32,
 }
 
 //#[derive(Debug)]
 pub struct Kernel {
-    kd: KernelData,
+    pub(crate) vat_dispatch: HashMap<VatID, Box<dyn Dispatch>>,
+    pub(crate) kd: Rc<RefCell<KernelData>>,
 }
 
 impl Kernel {
-    pub fn new(vats: HashMap<VatName, Box<dyn Dispatch>>) -> Self {
-        let mut vat_names = <HashMap<VatName, VatID>>::new();
-        let mut vat_dispatch = <HashMap<VatID, Box<dyn Dispatch>>>::new();
-        let mut vat_data = <HashMap<VatID, VatData>>::new();
+    pub fn new(cfg: Config) -> Self {
+        let mut vat_dispatch = HashMap::new();
+        let kd = Rc::new(RefCell::new(KernelData {
+            vat_names: HashMap::new(),
+            vat_data: HashMap::new(),
+            run_queue: RunQueue::default(),
+            next_promise_resolver_id: 0,
+        }));
         let mut id = 0;
-        for (key, dispatch) in vats {
+        for (key, setup) in cfg.vats {
             let vat_id = VatID(id);
             id += 1;
-            vat_names.insert(VatName(key.0.clone()), vat_id);
-            vat_dispatch.insert(vat_id, dispatch);
+            kd.borrow_mut()
+                .vat_names
+                .insert(VatName(key.0.clone()), vat_id);
             let vd = VatData {
                 vat_id,
                 import_clist: CList::new(),
                 promise_clist: CList::new(),
                 resolver_clist: CList::new(),
             };
-            vat_data.insert(vat_id, vd);
+            kd.borrow_mut().vat_data.insert(vat_id, vd);
+            let syscall = VatSyscall::new(vat_id, kd.clone());
+            let dispatch = setup(Box::new(syscall));
+            vat_dispatch.insert(vat_id, dispatch);
         }
-        Kernel {
-            kd: KernelData {
-                vat_names,
-                vat_dispatch,
-                vat_data,
-                run_queue: RunQueue::default(),
-                next_promise_resolver_id: Cell::new(0),
-            },
-        }
+        Kernel { vat_dispatch, kd }
     }
 
     /*
@@ -152,19 +154,20 @@ impl Kernel {
         to_vat: &VatName,
         to_id: u32,
     ) {
-        let for_vat_id = self.kd.vat_names.get(&for_vat).unwrap();
-        let to_vat_id = *self.kd.vat_names.get(&to_vat).unwrap();
-        let clist = &mut self.kd.vat_data.get_mut(for_vat_id).unwrap().import_clist;
-        clist.add(
+        let mut kd = self.kd.borrow_mut();
+        let for_vat_id = *kd.vat_names.get(&for_vat).unwrap();
+        let to_vat_id = *kd.vat_names.get(&to_vat).unwrap();
+        kd.vat_data.get_mut(&for_vat_id).unwrap().import_clist.add(
             KernelExport(to_vat_id, KernelExportID(to_id)),
             VatImportID(for_id),
         );
     }
 
     fn allocate_promise_resolver_pair(&self) -> (KernelPromiseID, KernelResolverID) {
-        let id = self.kd.next_promise_resolver_id.get();
+        let mut kd = self.kd.borrow_mut();
+        let id = kd.next_promise_resolver_id;
         let next_id = id + 1;
-        self.kd.next_promise_resolver_id.set(next_id);
+        kd.next_promise_resolver_id = next_id;
         (KernelPromiseID(id), KernelResolverID(id))
     }
 
@@ -174,14 +177,15 @@ impl Kernel {
         export: KernelExportID,
         message: KernelMessage,
     ) {
-        let vat_id = *self.kd.vat_names.get(&name).unwrap();
         let (_pid, rid) = self.allocate_promise_resolver_pair();
+        let mut kd = self.kd.borrow_mut();
+        let vat_id = *kd.vat_names.get(&name).unwrap();
         let pd = PendingDelivery {
             target: KernelTarget::Export(KernelExport(vat_id, export)),
             message,
             resolver: Some(rid),
         };
-        self.kd.run_queue.0.push_back(pd);
+        kd.run_queue.0.push_back(pd);
     }
 
     /// exports return home with the same index
@@ -195,42 +199,30 @@ impl Kernel {
         match t {
             KernelTarget::Export(KernelExport(vat_id, kid)) => {
                 let veid = self.map_inbound_target(kid);
-                let mut vd = self.kd.vat_data.get_mut(&vat_id).unwrap();
-                let kmsg = pd.message;
-                let vmsg = VatMessage {
-                    name: kmsg.name,
-                    args: VatCapData {
-                        body: kmsg.args.body,
-                        slots: kmsg
-                            .args
-                            .slots
-                            .into_iter()
-                            .map(|slot| vd.map_inbound_arg_slot(slot))
-                            .collect(),
-                    },
+                let (vmsg, vrid) = {
+                    let mut kd = self.kd.borrow_mut();
+                    let vd = kd.vat_data.get_mut(&vat_id).unwrap();
+                    let kmsg = pd.message;
+                    let vmsg = VatMessage {
+                        name: kmsg.name,
+                        args: VatCapData {
+                            body: kmsg.args.body,
+                            slots: kmsg
+                                .args
+                                .slots
+                                .into_iter()
+                                .map(|slot| vd.map_inbound_arg_slot(slot))
+                                .collect(),
+                        },
+                    };
+                    let vrid: Option<VatResolverID> = match pd.resolver {
+                        Some(krid) => Some(vd.map_inbound_resolver(krid)),
+                        None => None,
+                    };
+                    (vmsg, vrid)
                 };
-                let vrid: Option<VatResolverID> = match pd.resolver {
-                    Some(krid) => Some(vd.map_inbound_resolver(krid)),
-                    None => None,
-                };
-
-                //let VatData{ clist, dispatch } = self.kd.vats.get_mut(&vat_id).unwrap();
-                let nprid = &self.kd.next_promise_resolver_id;
-                let allocate_promise_resolver_pair = || {
-                    let id = nprid.get();
-                    let next_id = id + 1;
-                    nprid.set(next_id);
-                    (KernelPromiseID(id), KernelResolverID(id))
-                };
-                let vm = VatManager {
-                    vat_id,
-                    run_queue: &mut self.kd.run_queue,
-                    vat_data: &mut vd,
-                    allocate_promise_resolver_pair: &allocate_promise_resolver_pair,
-                };
-                let mut syscall = VatSyscall::new(vm);
-                let dispatch = self.kd.vat_dispatch.get_mut(&vat_id).unwrap();
-                dispatch.deliver(&mut syscall, veid, vmsg, vrid);
+                let dispatch = self.vat_dispatch.get_mut(&vat_id).unwrap();
+                dispatch.deliver(veid, vmsg, vrid);
             }
             //KernelTarget::Promise(_pid) => {}
             _ => panic!(),
@@ -239,7 +231,8 @@ impl Kernel {
 
     pub fn step(&mut self) {
         println!("kernel.step");
-        if let Some(pd) = self.kd.run_queue.0.pop_front() {
+        let pdo = self.kd.borrow_mut().run_queue.0.pop_front();
+        if let Some(pd) = pdo {
             self.process(pd);
         }
     }
@@ -251,7 +244,7 @@ impl Kernel {
     pub fn dump(&self) {
         println!("Kernel Dump:");
         println!(" run-queue:");
-        for pd in &self.kd.run_queue.0 {
+        for pd in &self.kd.borrow().run_queue.0 {
             println!("  {:?}", pd);
         }
     }

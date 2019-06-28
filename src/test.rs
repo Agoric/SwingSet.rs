@@ -5,17 +5,17 @@ use super::{
 use std::cell::RefCell;
 use std::rc::Rc;
 
-#[derive(Debug)]
+//#[derive(Debug)]
 struct Vat1Dispatch {
+    syscall: Box<dyn Syscall>,
     log: Rc<RefCell<Vec<u32>>>,
 }
 impl Dispatch for Vat1Dispatch {
     fn deliver(
         &mut self,
-        syscall: &mut dyn Syscall,
         target: VatExportID,
         message: VatMessage,
-        resolver: Option<VatResolverID>,
+        _resolver: Option<VatResolverID>,
     ) -> () {
         println!("Vat1.deliver {}", target);
         match target {
@@ -27,7 +27,7 @@ impl Dispatch for Vat1Dispatch {
                 self.log.borrow_mut().push(1);
                 let t = VatSendTarget::Import(VatImportID(1));
                 let vmsg = VatMessage::new("foo", b"body", vec![]);
-                let p = syscall.send(t, vmsg);
+                let p = self.syscall.send(t, vmsg);
                 println!(" got promise {}", p);
             }
             VatExportID(2) => {
@@ -48,14 +48,18 @@ impl Dispatch for Vat1Dispatch {
     fn notify_reject(&mut self, _id: VatPromiseID, _data: VatCapData) {}
 }
 
+use super::config::Setup;
 #[test]
 fn test_build() {
     let mut cfg = Config::new();
     let log: Vec<u32> = vec![];
     let r = Rc::new(RefCell::new(log));
-    let vat1 = Vat1Dispatch { log: r.clone() };
+    let r2 = r.clone();
     let vn = VatName("bootstrap".to_string());
-    cfg.add_vat(&vn, vat1);
+    let setup =
+        |syscall| -> Box<dyn Dispatch> { Box::new(Vat1Dispatch { syscall, log: r2 }) };
+    let sb: Box<Setup> = Box::new(setup);
+    cfg.add_vat(&vn, sb);
     let mut c = Controller::new(cfg);
     c.add_import(&vn, 1, &vn, 2);
     //println!("controller: {:?}", c);

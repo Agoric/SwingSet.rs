@@ -3,9 +3,8 @@ use super::kernel_types::{
     KernelArgSlot, KernelCapData, KernelExport, KernelExportID, KernelMessage,
     KernelPromiseID, KernelResolverID, KernelTarget, VatID,
 };
-use super::vat_types::{
-    VatArgSlot, VatCapData, VatExportID, VatMessage, VatPromiseID, VatSendTarget,
-};
+use super::syscall::Syscall;
+use super::vat_types::{VatArgSlot, VatMessage, VatPromiseID, VatSendTarget};
 
 pub(crate) struct VatManager<'a> {
     pub vat_id: VatID,
@@ -53,10 +52,6 @@ impl<'a> VatSyscall<'a> {
     }
 }
 
-pub trait Syscall {
-    fn send(&mut self, target: VatSendTarget, vmsg: VatMessage) -> VatPromiseID;
-}
-
 impl<'a> Syscall for VatSyscall<'a> {
     fn send(&mut self, vtarget: VatSendTarget, vmsg: VatMessage) -> VatPromiseID {
         println!("syscall.send {}.{}", vtarget, vmsg.name);
@@ -79,18 +74,4 @@ impl<'a> Syscall for VatSyscall<'a> {
         self.vm.run_queue.0.push_back(pd);
         self.vm.vat_data.promise_clist.map_inbound(kpid)
     }
-}
-
-// TODO: we need a name for the pass-by-presence type. "target"? "export"?
-
-pub trait Dispatch {
-    fn deliver(
-        &mut self,
-        syscall: &mut dyn Syscall,
-        target: VatExportID,
-        message: VatMessage,
-    ) -> ();
-    fn notify_fulfill_to_target(&mut self, id: VatPromiseID, target: VatSendTarget);
-    fn notify_fulfill_to_data(&mut self, id: VatPromiseID, data: VatCapData);
-    fn notify_reject(&mut self, id: VatPromiseID, data: VatCapData);
 }

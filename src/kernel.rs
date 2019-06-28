@@ -1,9 +1,10 @@
 use super::clist::{CList, CListKernelEntry, CListVatEntry};
+use super::dispatch::Dispatch;
 use super::kernel_types::{
     KernelArgSlot, KernelExport, KernelExportID, KernelMessage, KernelPromiseID,
     KernelResolverID, KernelTarget, VatID, VatName,
 };
-use super::vat::{Dispatch, VatManager, VatSyscall};
+use super::vat::{VatManager, VatSyscall};
 use super::vat_types::{
     VatArgSlot, VatCapData, VatExportID, VatImportID, VatMessage, VatPromiseID,
 };

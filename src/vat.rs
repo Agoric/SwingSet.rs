@@ -4,7 +4,10 @@ use super::kernel_types::{
     KernelPromiseID, KernelResolverID, KernelTarget, VatID,
 };
 use super::syscall::Syscall;
-use super::vat_types::{VatArgSlot, VatMessage, VatPromiseID, VatSendTarget};
+use super::vat_types::{
+    VatArgSlot, VatCapData, VatExportID, VatMessage, VatPromiseID, VatResolverID,
+    VatSendTarget,
+};
 
 pub(crate) struct VatManager<'a> {
     pub vat_id: VatID,
@@ -93,5 +96,24 @@ impl<'a> Syscall for VatSyscall<'a> {
         println!(" kt: {}.{}", ktarget, kmsg.name);
         let pd = PendingDelivery::new(ktarget, kmsg, None);
         self.vm.run_queue.0.push_back(pd);
+    }
+
+    fn allocate_promise_and_resolver(&mut self) -> (VatPromiseID, VatResolverID) {
+        panic!();
+    }
+    fn subscribe(&mut self, _id: VatPromiseID) {
+        panic!();
+    }
+    fn fulfill_to_target(&mut self, _resolver: VatResolverID, _target: VatExportID) {
+        panic!();
+    }
+    fn fulfill_to_data(&mut self, _resolver: VatResolverID, _data: VatCapData) {
+        panic!();
+    }
+    fn reject(&mut self, _resolver: VatResolverID, _data: VatCapData) {
+        panic!();
+    }
+    fn forward(&mut self, _resolver: VatResolverID, _target: VatPromiseID) {
+        panic!();
     }
 }

@@ -7,6 +7,7 @@ use super::kernel_types::{
 use super::vat::{VatManager, VatSyscall};
 use super::vat_types::{
     VatArgSlot, VatCapData, VatExportID, VatImportID, VatMessage, VatPromiseID,
+    VatResolverID,
 };
 use std::cell::Cell;
 use std::collections::{HashMap, VecDeque};
@@ -21,8 +22,14 @@ impl CListVatEntry for VatPromiseID {
         VatPromiseID(index)
     }
 }
+impl CListVatEntry for VatResolverID {
+    fn new(index: u32) -> Self {
+        VatResolverID(index)
+    }
+}
 impl CListKernelEntry for KernelExport {}
 impl CListKernelEntry for KernelPromiseID {}
+impl CListKernelEntry for KernelResolverID {}
 
 #[derive(Debug)]
 pub struct PendingDelivery {
@@ -48,6 +55,7 @@ pub(crate) struct VatData {
     vat_id: VatID,
     pub(crate) import_clist: CList<KernelExport, VatImportID>,
     pub(crate) promise_clist: CList<KernelPromiseID, VatPromiseID>,
+    pub(crate) resolver_clist: CList<KernelResolverID, VatResolverID>,
 }
 impl VatData {
     pub fn map_inbound_arg_slot(&mut self, slot: KernelArgSlot) -> VatArgSlot {
@@ -67,6 +75,13 @@ impl VatData {
                 VatArgSlot::Promise(self.promise_clist.map_inbound(kp))
             }
         }
+    }
+
+    pub fn map_inbound_resolver(&mut self, krid: KernelResolverID) -> VatResolverID {
+        self.resolver_clist.map_inbound(krid)
+    }
+    pub fn map_outbound_resolver(&mut self, vrid: VatResolverID) -> KernelResolverID {
+        self.resolver_clist.map_outbound(vrid)
     }
 }
 
@@ -97,6 +112,7 @@ impl Kernel {
                 vat_id,
                 import_clist: CList::new(),
                 promise_clist: CList::new(),
+                resolver_clist: CList::new(),
             };
             vat_data.insert(vat_id, vd);
         }
@@ -187,6 +203,10 @@ impl Kernel {
                             .collect(),
                     },
                 };
+                let vrid: Option<VatResolverID> = match pd.resolver {
+                    Some(krid) => Some(vd.map_inbound_resolver(krid)),
+                    None => None,
+                };
 
                 //let VatData{ clist, dispatch } = self.vats.get_mut(&vat_id).unwrap();
                 let nprid = &self.next_promise_resolver_id;
@@ -204,7 +224,7 @@ impl Kernel {
                 };
                 let mut syscall = VatSyscall::new(vm);
                 let dispatch = self.vat_dispatch.get_mut(&vat_id).unwrap();
-                dispatch.deliver(&mut syscall, veid, vmsg);
+                dispatch.deliver(&mut syscall, veid, vmsg, vrid);
             }
             //KernelTarget::Promise(_pid) => {}
             _ => panic!(),

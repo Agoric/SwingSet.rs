@@ -1,6 +1,6 @@
 use super::{
     Config, Controller, Dispatch, Syscall, VatCapData, VatExportID, VatImportID,
-    VatMessage, VatName, VatPromiseID, VatSendTarget,
+    VatMessage, VatName, VatPromiseID, VatResolverID, VatSendTarget,
 };
 use std::cell::RefCell;
 use std::rc::Rc;
@@ -15,6 +15,7 @@ impl Dispatch for Vat1Dispatch {
         syscall: &mut dyn Syscall,
         target: VatExportID,
         message: VatMessage,
+        resolver: Option<VatResolverID>,
     ) -> () {
         println!("Vat1.deliver {}", target);
         match target {

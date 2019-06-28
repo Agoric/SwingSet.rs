@@ -9,6 +9,14 @@ impl fmt::Display for VatPromiseID {
 }
 
 #[derive(Debug, Eq, PartialEq, Hash, Copy, Clone)]
+pub struct VatResolverID(pub u32);
+impl fmt::Display for VatResolverID {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        write!(f, "VatResolverID-{}", self.0)
+    }
+}
+
+#[derive(Debug, Eq, PartialEq, Hash, Copy, Clone)]
 pub struct VatExportID(pub u32);
 impl fmt::Display for VatExportID {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {

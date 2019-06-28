@@ -12,7 +12,7 @@ pub struct KernelExportID(pub u32);
 // these two refer to the same object
 #[derive(Debug, Eq, PartialEq, Hash, Copy, Clone)]
 pub(crate) struct KernelPromiseID(pub u32);
-#[derive(Debug, Eq, PartialEq, Hash)]
+#[derive(Debug, Eq, PartialEq, Hash, Copy, Clone)]
 pub(crate) struct KernelResolverID(pub u32);
 
 /// "KernelExport" is the kernel's representation of a pass-by-presence

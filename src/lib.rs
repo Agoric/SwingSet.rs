@@ -16,5 +16,6 @@ pub use dispatch::Dispatch;
 pub use kernel_types::VatName;
 pub use syscall::Syscall;
 pub use vat_types::{
-    VatCapData, VatExportID, VatImportID, VatMessage, VatPromiseID, VatSendTarget,
+    VatCapData, VatExportID, VatImportID, VatMessage, VatPromiseID, VatResolverID,
+    VatSendTarget,
 };

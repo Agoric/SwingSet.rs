@@ -7,16 +7,14 @@ pub struct DeviceName(pub String);
 #[derive(Debug)]
 pub struct DeviceSetup(pub Fn(impl Syscall) -> impl Dispatch);*/
 
-//#[derive(Debug)]
+#[derive(Default)]
 pub struct Config {
     pub(crate) vats: HashMap<VatName, Box<dyn Dispatch>>,
     //devices: HashMap<DeviceName, DeviceSetup>,
 }
 impl Config {
     pub fn new() -> Self {
-        Config {
-            vats: HashMap::new(),
-        }
+        Config::default()
     }
     pub fn add_vat(&mut self, name: &VatName, dispatch: impl Dispatch + 'static) {
         let vn = VatName(name.0.clone());

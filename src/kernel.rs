@@ -28,13 +28,13 @@ impl CListKernelEntry for KernelPromiseID {}
 pub struct PendingDelivery {
     target: KernelTarget,
     message: KernelMessage,
-    resolver: KernelResolverID,
+    resolver: Option<KernelResolverID>,
 }
 impl PendingDelivery {
     pub(crate) fn new(
         target: KernelTarget,
         message: KernelMessage,
-        resolver: KernelResolverID,
+        resolver: Option<KernelResolverID>,
     ) -> Self {
         PendingDelivery {
             target,
@@ -157,7 +157,7 @@ impl Kernel {
         let pd = PendingDelivery {
             target: KernelTarget::Export(KernelExport(vat_id, export)),
             message,
-            resolver: rid,
+            resolver: Some(rid),
         };
         self.run_queue.0.push_back(pd);
     }

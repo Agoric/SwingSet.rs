@@ -70,8 +70,28 @@ impl<'a> Syscall for VatSyscall<'a> {
             },
         };
         println!(" kt: {}.{}", ktarget, kmsg.name);
-        let pd = PendingDelivery::new(ktarget, kmsg, krid);
+        let pd = PendingDelivery::new(ktarget, kmsg, Some(krid));
         self.vm.run_queue.0.push_back(pd);
         self.vm.vat_data.promise_clist.map_inbound(kpid)
+    }
+
+    fn send_only(&mut self, vtarget: VatSendTarget, vmsg: VatMessage) {
+        println!("syscall.send {}.{}", vtarget, vmsg.name);
+        let ktarget = self.map_outbound_target(vtarget);
+        let kmsg = KernelMessage {
+            name: vmsg.name.to_string(),
+            args: KernelCapData {
+                body: vmsg.args.body,
+                slots: vmsg
+                    .args
+                    .slots
+                    .into_iter()
+                    .map(|slot| self.map_outbound_arg_slot(slot))
+                    .collect(),
+            },
+        };
+        println!(" kt: {}.{}", ktarget, kmsg.name);
+        let pd = PendingDelivery::new(ktarget, kmsg, None);
+        self.vm.run_queue.0.push_back(pd);
     }
 }

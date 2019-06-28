@@ -11,7 +11,7 @@ pub trait Dispatch {
         syscall: &mut dyn Syscall,
         target: VatExportID,
         message: VatMessage,
-    ) -> ();
+    );
     fn notify_fulfill_to_target(&mut self, id: VatPromiseID, target: VatSendTarget);
     fn notify_fulfill_to_data(&mut self, id: VatPromiseID, data: VatCapData);
     fn notify_reject(&mut self, id: VatPromiseID, data: VatCapData);

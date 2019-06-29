@@ -168,27 +168,18 @@ impl Kernel {
         );
     }
 
-    fn allocate_promise_resolver_pair(&self) -> KernelPromiseResolverID {
-        let mut kd = self.kd.borrow_mut();
-        let id = kd.next_promise_resolver_id;
-        let next_id = id + 1;
-        kd.next_promise_resolver_id = next_id;
-        KernelPromiseResolverID(id)
-    }
-
     pub(crate) fn push(
         &mut self,
         name: &VatName,
         export: KernelExportID,
         message: KernelMessage,
     ) {
-        let kprid = self.allocate_promise_resolver_pair();
         let mut kd = self.kd.borrow_mut();
         let vat_id = *kd.vat_names.get(&name).unwrap();
         let pd = PendingDelivery {
             target: KernelTarget::Export(KernelExport(vat_id, export)),
             message,
-            resolver: Some(kprid),
+            resolver: None,
         };
         kd.run_queue.0.push_back(pd);
     }

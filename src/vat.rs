@@ -63,51 +63,51 @@ impl VatSyscall {
         let vpid = vd.promise_clist.map_inbound(kprid);
         (vpid, kprid)
     }
+
+    fn do_send(
+        &mut self,
+        vtarget: VatSendTarget,
+        vmsg: VatMessage,
+        send_only: bool,
+    ) -> Option<VatPromiseID> {
+        println!("syscall.send {}.{}", vtarget, vmsg.name);
+        let ktarget = self.map_outbound_target(vtarget);
+        let (ovpid, okrid) = match send_only {
+            false => {
+                let (vpid, krid) = self.allocate_promise_resolver_pair();
+                (Some(vpid), Some(krid))
+            }
+            true => (None, None),
+        };
+
+        let kmsg = KernelMessage {
+            name: vmsg.name.to_string(),
+            args: KernelCapData {
+                body: vmsg.args.body,
+                slots: vmsg
+                    .args
+                    .slots
+                    .into_iter()
+                    .map(|slot| self.map_outbound_arg_slot(slot))
+                    .collect(),
+            },
+        };
+        println!(" kt: {}.{}", ktarget, kmsg.name);
+        let pd = PendingDelivery::new(ktarget, kmsg, okrid);
+
+        self.kd.borrow_mut().run_queue.0.push_back(pd);
+        ovpid
+    }
 }
 
 impl Syscall for VatSyscall {
     fn send(&mut self, vtarget: VatSendTarget, vmsg: VatMessage) -> VatPromiseID {
-        println!("syscall.send {}.{}", vtarget, vmsg.name);
-        let ktarget = self.map_outbound_target(vtarget);
-        let (vpid, krid) = self.allocate_promise_resolver_pair();
-
-        let kmsg = KernelMessage {
-            name: vmsg.name.to_string(),
-            args: KernelCapData {
-                body: vmsg.args.body,
-                slots: vmsg
-                    .args
-                    .slots
-                    .into_iter()
-                    .map(|slot| self.map_outbound_arg_slot(slot))
-                    .collect(),
-            },
-        };
-        println!(" kt: {}.{}", ktarget, kmsg.name);
-        let pd = PendingDelivery::new(ktarget, kmsg, Some(krid));
-
-        self.kd.borrow_mut().run_queue.0.push_back(pd);
-        vpid
+        let ovpid = self.do_send(vtarget, vmsg, false);
+        ovpid.unwrap()
     }
 
     fn send_only(&mut self, vtarget: VatSendTarget, vmsg: VatMessage) {
-        println!("syscall.send {}.{}", vtarget, vmsg.name);
-        let ktarget = self.map_outbound_target(vtarget);
-        let kmsg = KernelMessage {
-            name: vmsg.name.to_string(),
-            args: KernelCapData {
-                body: vmsg.args.body,
-                slots: vmsg
-                    .args
-                    .slots
-                    .into_iter()
-                    .map(|slot| self.map_outbound_arg_slot(slot))
-                    .collect(),
-            },
-        };
-        println!(" kt: {}.{}", ktarget, kmsg.name);
-        let pd = PendingDelivery::new(ktarget, kmsg, None);
-        self.kd.borrow_mut().run_queue.0.push_back(pd);
+        self.do_send(vtarget, vmsg, true);
     }
 
     fn allocate_promise_and_resolver(&mut self) -> (VatPromiseID, VatResolverID) {

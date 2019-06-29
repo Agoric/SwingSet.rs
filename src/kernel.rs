@@ -2,8 +2,8 @@ use super::clist::{CList, CListKernelEntry, CListVatEntry};
 use super::config::Config;
 use super::dispatch::Dispatch;
 use super::kernel_types::{
-    KernelArgSlot, KernelExport, KernelExportID, KernelMessage, KernelPromiseID,
-    KernelResolverID, KernelTarget, VatID, VatName,
+    KernelArgSlot, KernelExport, KernelExportID, KernelMessage, KernelPromiseResolverID,
+    KernelTarget, VatID, VatName,
 };
 use super::vat::VatSyscall;
 use super::vat_types::{
@@ -30,20 +30,19 @@ impl CListVatEntry for VatResolverID {
     }
 }
 impl CListKernelEntry for KernelExport {}
-impl CListKernelEntry for KernelPromiseID {}
-impl CListKernelEntry for KernelResolverID {}
+impl CListKernelEntry for KernelPromiseResolverID {}
 
 #[derive(Debug)]
 pub struct PendingDelivery {
     target: KernelTarget,
     message: KernelMessage,
-    resolver: Option<KernelResolverID>,
+    resolver: Option<KernelPromiseResolverID>,
 }
 impl PendingDelivery {
     pub(crate) fn new(
         target: KernelTarget,
         message: KernelMessage,
-        resolver: Option<KernelResolverID>,
+        resolver: Option<KernelPromiseResolverID>,
     ) -> Self {
         PendingDelivery {
             target,
@@ -56,8 +55,8 @@ impl PendingDelivery {
 pub(crate) struct VatData {
     vat_id: VatID,
     pub(crate) import_clist: CList<KernelExport, VatImportID>,
-    pub(crate) promise_clist: CList<KernelPromiseID, VatPromiseID>,
-    pub(crate) resolver_clist: CList<KernelResolverID, VatResolverID>,
+    pub(crate) promise_clist: CList<KernelPromiseResolverID, VatPromiseID>,
+    pub(crate) resolver_clist: CList<KernelPromiseResolverID, VatResolverID>,
 }
 impl VatData {
     pub fn map_inbound_arg_slot(&mut self, slot: KernelArgSlot) -> VatArgSlot {
@@ -79,10 +78,16 @@ impl VatData {
         }
     }
 
-    pub fn map_inbound_resolver(&mut self, krid: KernelResolverID) -> VatResolverID {
+    pub fn map_inbound_resolver(
+        &mut self,
+        krid: KernelPromiseResolverID,
+    ) -> VatResolverID {
         self.resolver_clist.map_inbound(krid)
     }
-    pub fn map_outbound_resolver(&mut self, vrid: VatResolverID) -> KernelResolverID {
+    pub fn map_outbound_resolver(
+        &mut self,
+        vrid: VatResolverID,
+    ) -> KernelPromiseResolverID {
         self.resolver_clist.map_outbound(vrid)
     }
 }
@@ -163,12 +168,12 @@ impl Kernel {
         );
     }
 
-    fn allocate_promise_resolver_pair(&self) -> (KernelPromiseID, KernelResolverID) {
+    fn allocate_promise_resolver_pair(&self) -> KernelPromiseResolverID {
         let mut kd = self.kd.borrow_mut();
         let id = kd.next_promise_resolver_id;
         let next_id = id + 1;
         kd.next_promise_resolver_id = next_id;
-        (KernelPromiseID(id), KernelResolverID(id))
+        KernelPromiseResolverID(id)
     }
 
     pub(crate) fn push(
@@ -177,13 +182,13 @@ impl Kernel {
         export: KernelExportID,
         message: KernelMessage,
     ) {
-        let (_pid, rid) = self.allocate_promise_resolver_pair();
+        let kprid = self.allocate_promise_resolver_pair();
         let mut kd = self.kd.borrow_mut();
         let vat_id = *kd.vat_names.get(&name).unwrap();
         let pd = PendingDelivery {
             target: KernelTarget::Export(KernelExport(vat_id, export)),
             message,
-            resolver: Some(rid),
+            resolver: Some(kprid),
         };
         kd.run_queue.0.push_back(pd);
     }

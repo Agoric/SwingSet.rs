@@ -1,7 +1,7 @@
 use super::kernel::{KernelData, PendingDelivery};
 use super::kernel_types::{
     KernelArgSlot, KernelCapData, KernelExport, KernelExportID, KernelMessage,
-    KernelPromiseID, KernelResolverID, KernelTarget, VatID,
+    KernelPromiseResolverID, KernelTarget, VatID,
 };
 use super::syscall::Syscall;
 use super::vat_types::{
@@ -54,15 +54,14 @@ impl VatSyscall {
         }
     }
 
-    fn allocate_promise_resolver_pair(&self) -> (VatPromiseID, KernelResolverID) {
+    fn allocate_promise_resolver_pair(&self) -> (VatPromiseID, KernelPromiseResolverID) {
         let mut kd = self.kd.borrow_mut();
         let id = kd.next_promise_resolver_id;
         kd.next_promise_resolver_id = id + 1;
-        let krid = KernelResolverID(id);
-        let kpid = KernelPromiseID(id);
+        let kprid = KernelPromiseResolverID(id);
         let vd = kd.vat_data.get_mut(&self.vat_id).unwrap();
-        let vpid = vd.promise_clist.map_inbound(kpid);
-        (vpid, krid)
+        let vpid = vd.promise_clist.map_inbound(kprid);
+        (vpid, kprid)
     }
 }
 

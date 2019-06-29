@@ -9,11 +9,9 @@ pub struct VatID(pub u32);
 #[derive(Debug, Eq, PartialEq, Hash, Copy, Clone)]
 pub struct KernelExportID(pub u32);
 
-// these two refer to the same object
+// within the kernel, promises and resolvers always appear in pairs
 #[derive(Debug, Eq, PartialEq, Hash, Copy, Clone)]
-pub(crate) struct KernelPromiseID(pub u32);
-#[derive(Debug, Eq, PartialEq, Hash, Copy, Clone)]
-pub(crate) struct KernelResolverID(pub u32);
+pub(crate) struct KernelPromiseResolverID(pub u32);
 
 /// "KernelExport" is the kernel's representation of a pass-by-presence
 /// object that has been exported by some Vat
@@ -26,7 +24,7 @@ pub(crate) struct KernelExport(pub VatID, pub KernelExportID);
 #[derive(Debug, Eq, PartialEq, Hash, Copy, Clone)]
 pub(crate) enum KernelTarget {
     Export(KernelExport),
-    Promise(KernelPromiseID),
+    Promise(KernelPromiseResolverID),
 }
 
 /// "KernelArgSlot" is the kernel's representation of something which can be
@@ -34,7 +32,7 @@ pub(crate) enum KernelTarget {
 #[derive(Debug, Eq, PartialEq, Hash, Copy, Clone)]
 pub(crate) enum KernelArgSlot {
     Export(KernelExport),
-    Promise(KernelPromiseID),
+    Promise(KernelPromiseResolverID),
 }
 
 #[derive(Debug)]
@@ -65,15 +63,9 @@ impl fmt::Display for KernelExportID {
     }
 }
 
-impl fmt::Display for KernelPromiseID {
+impl fmt::Display for KernelPromiseResolverID {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-        write!(f, "KernelPromiseID-{}", self.0)
-    }
-}
-
-impl fmt::Display for KernelResolverID {
-    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-        write!(f, "KernelResolverID-{}", self.0)
+        write!(f, "KernelPromiseResolverID-{}", self.0)
     }
 }
 
@@ -103,8 +95,8 @@ impl fmt::Display for KernelArgSlot {
     }
 }
 
-impl From<KernelPromiseID> for KernelArgSlot {
-    fn from(id: KernelPromiseID) -> KernelArgSlot {
+impl From<KernelPromiseResolverID> for KernelArgSlot {
+    fn from(id: KernelPromiseResolverID) -> KernelArgSlot {
         KernelArgSlot::Promise(id)
     }
 }

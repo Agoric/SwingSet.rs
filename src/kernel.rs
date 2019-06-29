@@ -7,7 +7,7 @@ use super::kernel_types::{
 };
 use super::vat::VatSyscall;
 use super::vat_types::{
-    VatArgSlot, VatCapData, VatExportID, VatImportID, VatMessage, VatPromiseID,
+    InboundVatMessage, VatArgSlot, VatCapData, VatExportID, VatImportID, VatPromiseID,
     VatResolverID,
 };
 use std::cell::RefCell;
@@ -36,19 +36,10 @@ impl CListKernelEntry for KernelPromiseResolverID {}
 pub struct PendingDelivery {
     target: KernelTarget,
     message: KernelMessage,
-    resolver: Option<KernelPromiseResolverID>,
 }
 impl PendingDelivery {
-    pub(crate) fn new(
-        target: KernelTarget,
-        message: KernelMessage,
-        resolver: Option<KernelPromiseResolverID>,
-    ) -> Self {
-        PendingDelivery {
-            target,
-            message,
-            resolver,
-        }
+    pub(crate) fn new(target: KernelTarget, message: KernelMessage) -> Self {
+        PendingDelivery { target, message }
     }
 }
 
@@ -179,7 +170,6 @@ impl Kernel {
         let pd = PendingDelivery {
             target: KernelTarget::Export(KernelExport(vat_id, export)),
             message,
-            resolver: None,
         };
         kd.run_queue.0.push_back(pd);
     }
@@ -195,11 +185,15 @@ impl Kernel {
         match t {
             KernelTarget::Export(KernelExport(vat_id, kid)) => {
                 let veid = self.map_inbound_target(kid);
-                let (vmsg, vrid) = {
+                let vmsg = {
                     let mut kd = self.kd.borrow_mut();
                     let vd = kd.vat_data.get_mut(&vat_id).unwrap();
                     let kmsg = pd.message;
-                    let vmsg = VatMessage {
+                    let ovrid: Option<VatResolverID> = match kmsg.resolver {
+                        Some(krid) => Some(vd.map_inbound_resolver(krid)),
+                        None => None,
+                    };
+                    InboundVatMessage {
                         name: kmsg.name,
                         args: VatCapData {
                             body: kmsg.args.body,
@@ -210,15 +204,11 @@ impl Kernel {
                                 .map(|slot| vd.map_inbound_arg_slot(slot))
                                 .collect(),
                         },
-                    };
-                    let vrid: Option<VatResolverID> = match pd.resolver {
-                        Some(krid) => Some(vd.map_inbound_resolver(krid)),
-                        None => None,
-                    };
-                    (vmsg, vrid)
+                        resolver: ovrid,
+                    }
                 };
                 let dispatch = self.vat_dispatch.get_mut(&vat_id).unwrap();
-                dispatch.deliver(veid, vmsg, vrid);
+                dispatch.deliver(veid, vmsg);
             }
             //KernelTarget::Promise(_pid) => {}
             _ => panic!(),

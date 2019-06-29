@@ -45,6 +45,7 @@ pub struct KernelCapData {
 pub(crate) struct KernelMessage {
     pub name: String,
     pub(crate) args: KernelCapData,
+    pub(crate) resolver: Option<KernelPromiseResolverID>,
 }
 
 impl fmt::Display for VatName {

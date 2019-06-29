@@ -1,10 +1,11 @@
 use super::vat_types::{
-    VatCapData, VatExportID, VatMessage, VatPromiseID, VatResolverID, VatSendTarget,
+    OutboundVatMessage, VatCapData, VatExportID, VatPromiseID, VatResolverID,
+    VatSendTarget,
 };
 
 pub trait Syscall {
-    fn send(&mut self, target: VatSendTarget, vmsg: VatMessage) -> VatPromiseID;
-    fn send_only(&mut self, target: VatSendTarget, vmsg: VatMessage);
+    fn send(&mut self, target: VatSendTarget, vmsg: OutboundVatMessage) -> VatPromiseID;
+    fn send_only(&mut self, target: VatSendTarget, vmsg: OutboundVatMessage);
     //fn invoke(&mut self, target: VatDeviceID, vmsg: VatMessage) -> VatCapData;
     fn allocate_promise_and_resolver(&mut self) -> (VatPromiseID, VatResolverID);
     fn subscribe(&mut self, id: VatPromiseID);

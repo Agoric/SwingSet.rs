@@ -34,6 +34,7 @@ impl Controller {
                     body: vec![],
                     slots: vec![],
                 },
+                resolver: None,
             },
         );
     }

@@ -1,6 +1,6 @@
 use super::{
-    Config, Controller, Dispatch, Syscall, VatCapData, VatExportID, VatImportID,
-    VatMessage, VatName, VatPromiseID, VatResolverID, VatSendTarget,
+    Config, Controller, Dispatch, InboundVatMessage, OutboundVatMessage, Syscall,
+    VatCapData, VatExportID, VatImportID, VatName, VatPromiseID, VatSendTarget,
 };
 use std::cell::RefCell;
 use std::rc::Rc;
@@ -11,12 +11,7 @@ struct Vat1Dispatch {
     log: Rc<RefCell<Vec<u32>>>,
 }
 impl Dispatch for Vat1Dispatch {
-    fn deliver(
-        &mut self,
-        target: VatExportID,
-        message: VatMessage,
-        _resolver: Option<VatResolverID>,
-    ) -> () {
+    fn deliver(&mut self, target: VatExportID, message: InboundVatMessage) -> () {
         println!("Vat1.deliver {}", target);
         match target {
             VatExportID(0) => {
@@ -26,7 +21,7 @@ impl Dispatch for Vat1Dispatch {
                 assert_eq!(message.args.slots, vec![]);
                 self.log.borrow_mut().push(1);
                 let t = VatSendTarget::Import(VatImportID(1));
-                let vmsg = VatMessage::new("foo", b"body", vec![]);
+                let vmsg = OutboundVatMessage::new("foo", b"body", vec![]);
                 let p = self.syscall.send(t, vmsg);
                 println!(" got promise {}", p);
             }

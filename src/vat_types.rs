@@ -93,18 +93,42 @@ pub struct VatCapData {
 }
 
 #[derive(Debug)]
-pub struct VatMessage {
+pub struct OutboundVatMessage {
     pub name: String,
     pub args: VatCapData,
 }
-impl VatMessage {
+impl OutboundVatMessage {
     pub fn new(name: &str, body: &[u8], slots: Vec<VatArgSlot>) -> Self {
-        VatMessage {
+        OutboundVatMessage {
             name: name.to_string(),
             args: VatCapData {
                 body: body.to_vec(),
                 slots,
             },
+        }
+    }
+}
+
+#[derive(Debug)]
+pub struct InboundVatMessage {
+    pub name: String,
+    pub args: VatCapData,
+    pub resolver: Option<VatResolverID>,
+}
+impl InboundVatMessage {
+    pub fn new(
+        name: &str,
+        body: &[u8],
+        slots: Vec<VatArgSlot>,
+        resolver: Option<VatResolverID>,
+    ) -> Self {
+        InboundVatMessage {
+            name: name.to_string(),
+            args: VatCapData {
+                body: body.to_vec(),
+                slots,
+            },
+            resolver,
         }
     }
 }

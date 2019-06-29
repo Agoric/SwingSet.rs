@@ -5,7 +5,7 @@ use super::kernel_types::{
 };
 use super::syscall::Syscall;
 use super::vat_types::{
-    VatArgSlot, VatCapData, VatExportID, VatMessage, VatPromiseID, VatResolverID,
+    OutboundVatMessage, VatArgSlot, VatCapData, VatExportID, VatPromiseID, VatResolverID,
     VatSendTarget,
 };
 use std::cell::RefCell;
@@ -54,7 +54,7 @@ impl VatSyscall {
         }
     }
 
-    fn allocate_promise_resolver_pair(&self) -> (VatPromiseID, KernelPromiseResolverID) {
+    fn allocate_result_promise(&self) -> (VatPromiseID, KernelPromiseResolverID) {
         let mut kd = self.kd.borrow_mut();
         let id = kd.next_promise_resolver_id;
         kd.next_promise_resolver_id = id + 1;
@@ -67,15 +67,15 @@ impl VatSyscall {
     fn do_send(
         &mut self,
         vtarget: VatSendTarget,
-        vmsg: VatMessage,
+        vmsg: OutboundVatMessage,
         send_only: bool,
     ) -> Option<VatPromiseID> {
         println!("syscall.send {}.{}", vtarget, vmsg.name);
         let ktarget = self.map_outbound_target(vtarget);
-        let (ovpid, okrid) = match send_only {
+        let (ovpid, okprid) = match send_only {
             false => {
-                let (vpid, krid) = self.allocate_promise_resolver_pair();
-                (Some(vpid), Some(krid))
+                let (vpid, kprid) = self.allocate_result_promise();
+                (Some(vpid), Some(kprid))
             }
             true => (None, None),
         };
@@ -91,9 +91,10 @@ impl VatSyscall {
                     .map(|slot| self.map_outbound_arg_slot(slot))
                     .collect(),
             },
+            resolver: okprid,
         };
         println!(" kt: {}.{}", ktarget, kmsg.name);
-        let pd = PendingDelivery::new(ktarget, kmsg, okrid);
+        let pd = PendingDelivery::new(ktarget, kmsg);
 
         self.kd.borrow_mut().run_queue.0.push_back(pd);
         ovpid
@@ -101,18 +102,19 @@ impl VatSyscall {
 }
 
 impl Syscall for VatSyscall {
-    fn send(&mut self, vtarget: VatSendTarget, vmsg: VatMessage) -> VatPromiseID {
+    fn send(&mut self, vtarget: VatSendTarget, vmsg: OutboundVatMessage) -> VatPromiseID {
         let ovpid = self.do_send(vtarget, vmsg, false);
         ovpid.unwrap()
     }
 
-    fn send_only(&mut self, vtarget: VatSendTarget, vmsg: VatMessage) {
+    fn send_only(&mut self, vtarget: VatSendTarget, vmsg: OutboundVatMessage) {
         self.do_send(vtarget, vmsg, true);
     }
 
     fn allocate_promise_and_resolver(&mut self) -> (VatPromiseID, VatResolverID) {
         panic!();
     }
+
     fn subscribe(&mut self, _id: VatPromiseID) {
         panic!();
     }

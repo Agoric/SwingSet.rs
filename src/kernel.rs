@@ -61,7 +61,7 @@ impl VatData {
                 if vat_id == self.vat_id {
                     // the vat's own export, returning home
                     let keid: KernelExportID = ke.1;
-                    VatArgSlot::Import(VatImportID(keid.0))
+                    VatArgSlot::Export(VatExportID(keid.0))
                 } else {
                     // another vat's export, get/allocate in clist
                     VatArgSlot::Import(self.import_clist.map_inbound(ke))

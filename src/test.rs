@@ -1,6 +1,7 @@
 use super::{
     Config, Controller, Dispatch, InboundVatMessage, OutboundVatMessage, Syscall,
-    VatCapData, VatExportID, VatImportID, VatName, VatPromiseID, VatSendTarget,
+    VatArgSlot, VatCapData, VatExportID, VatImportID, VatName, VatPromiseID,
+    VatSendTarget,
 };
 use std::cell::RefCell;
 use std::rc::Rc;
@@ -9,6 +10,7 @@ use std::rc::Rc;
 struct Vat1Dispatch {
     syscall: Box<dyn Syscall>,
     log: Rc<RefCell<Vec<u32>>>,
+    p: Option<VatPromiseID>,
 }
 impl Dispatch for Vat1Dispatch {
     fn deliver(&mut self, target: VatExportID, message: InboundVatMessage) -> () {
@@ -21,15 +23,20 @@ impl Dispatch for Vat1Dispatch {
                 assert_eq!(message.args.slots, vec![]);
                 self.log.borrow_mut().push(1);
                 let t = VatSendTarget::Import(VatImportID(1));
-                let vmsg = OutboundVatMessage::new("foo", b"body", vec![]);
-                let p = self.syscall.send(t, vmsg);
-                println!(" got promise {}", p);
+                let arg1 = VatArgSlot::Export(VatExportID(22));
+                let vmsg = OutboundVatMessage::new("foo", b"body", vec![arg1]);
+                self.p = Some(self.syscall.send(t, vmsg));
+                assert_eq!(self.p, Some(VatPromiseID(0)));
+                println!(" got promise {:?}", self.p);
             }
             VatExportID(2) => {
                 println!(" deliver[2]");
                 assert_eq!(message.name, "foo");
                 assert_eq!(message.args.body, b"body");
-                assert_eq!(message.args.slots, vec![]);
+                assert_eq!(
+                    message.args.slots,
+                    vec![VatArgSlot::Export(VatExportID(22))]
+                );
                 self.log.borrow_mut().push(2);
             }
             _ => panic!("unknown target {}", target),
@@ -51,8 +58,13 @@ fn test_build() {
     let r = Rc::new(RefCell::new(log));
     let r2 = r.clone();
     let vn = VatName("bootstrap".to_string());
-    let setup =
-        |syscall| -> Box<dyn Dispatch> { Box::new(Vat1Dispatch { syscall, log: r2 }) };
+    let setup = |syscall| -> Box<dyn Dispatch> {
+        Box::new(Vat1Dispatch {
+            syscall,
+            log: r2,
+            p: None,
+        })
+    };
     let sb: Box<Setup> = Box::new(setup);
     cfg.add_vat(&vn, sb);
     let mut c = Controller::new(cfg);

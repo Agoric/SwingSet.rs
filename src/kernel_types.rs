@@ -35,7 +35,7 @@ pub(crate) enum KernelArgSlot {
     Promise(KernelPromiseResolverID),
 }
 
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub struct KernelCapData {
     pub body: Vec<u8>,
     pub(crate) slots: Vec<KernelArgSlot>,

@@ -3,8 +3,9 @@ use super::config::Config;
 use super::dispatch::Dispatch;
 use super::kernel_types::{
     KernelArgSlot, KernelExport, KernelExportID, KernelMessage, KernelPromiseResolverID,
-    KernelTarget, VatID, VatName,
+    VatID, VatName,
 };
+use super::promise::KernelPromise;
 use super::vat::VatSyscall;
 use super::vat_types::{
     InboundVatMessage, VatArgSlot, VatCapData, VatExportID, VatImportID, VatPromiseID,
@@ -33,14 +34,17 @@ impl CListKernelEntry for KernelExport {}
 impl CListKernelEntry for KernelPromiseResolverID {}
 
 #[derive(Debug)]
-pub struct PendingDelivery {
-    target: KernelTarget,
-    message: KernelMessage,
-}
-impl PendingDelivery {
-    pub(crate) fn new(target: KernelTarget, message: KernelMessage) -> Self {
-        PendingDelivery { target, message }
-    }
+pub(crate) enum PendingDelivery {
+    Deliver {
+        target: KernelExport,
+        message: KernelMessage,
+    },
+    DeliverPromise {
+        vat: VatID,
+        target: KernelPromiseResolverID,
+        message: KernelMessage,
+    },
+    // notify*
 }
 
 pub(crate) struct VatData {
@@ -84,13 +88,14 @@ impl VatData {
 }
 
 #[derive(Debug, Default)]
-pub struct RunQueue(pub VecDeque<PendingDelivery>);
+pub(crate) struct RunQueue(pub VecDeque<PendingDelivery>);
 
 pub(crate) struct KernelData {
     pub(crate) vat_names: HashMap<VatName, VatID>,
     pub(crate) vat_data: HashMap<VatID, VatData>,
     pub(crate) run_queue: RunQueue,
     pub(crate) next_promise_resolver_id: u32,
+    pub(crate) promises: HashMap<KernelPromiseResolverID, KernelPromise>,
 }
 
 //#[derive(Debug)]
@@ -106,6 +111,7 @@ impl Kernel {
             vat_names: HashMap::new(),
             vat_data: HashMap::new(),
             run_queue: RunQueue::default(),
+            promises: HashMap::default(),
             next_promise_resolver_id: 0,
         }));
         let mut id = 0;
@@ -167,8 +173,8 @@ impl Kernel {
     ) {
         let mut kd = self.kd.borrow_mut();
         let vat_id = *kd.vat_names.get(&name).unwrap();
-        let pd = PendingDelivery {
-            target: KernelTarget::Export(KernelExport(vat_id, export)),
+        let pd = PendingDelivery::Deliver {
+            target: KernelExport(vat_id, export),
             message,
         };
         kd.run_queue.0.push_back(pd);
@@ -180,15 +186,18 @@ impl Kernel {
     }
 
     fn process(&mut self, pd: PendingDelivery) {
-        let t = pd.target;
-        println!("process: {}.{}", t, pd.message.name);
-        match t {
-            KernelTarget::Export(KernelExport(vat_id, kid)) => {
+        match pd {
+            PendingDelivery::Deliver {
+                target,
+                message: kmsg,
+            } => {
+                let vat_id = target.0; // TODO nicer destructuring assignment
+                let kid = target.1;
+                println!("process: {}.{}", target, kmsg.name);
                 let veid = self.map_inbound_target(kid);
                 let vmsg = {
                     let mut kd = self.kd.borrow_mut();
                     let vd = kd.vat_data.get_mut(&vat_id).unwrap();
-                    let kmsg = pd.message;
                     let ovrid: Option<VatResolverID> = match kmsg.resolver {
                         Some(krid) => Some(vd.map_inbound_resolver(krid)),
                         None => None,
@@ -210,7 +219,7 @@ impl Kernel {
                 let dispatch = self.vat_dispatch.get_mut(&vat_id).unwrap();
                 dispatch.deliver(veid, vmsg);
             }
-            //KernelTarget::Promise(_pid) => {}
+            //PendingDelivery::DeliverPromise(..) => {}
             _ => panic!(),
         };
     }

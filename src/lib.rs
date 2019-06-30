@@ -4,6 +4,7 @@ mod controller;
 mod dispatch;
 mod kernel;
 mod kernel_types;
+mod promise;
 mod syscall;
 #[cfg(test)]
 mod test;

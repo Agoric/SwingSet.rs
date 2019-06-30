@@ -1,7 +1,7 @@
 use super::{
     Config, Controller, Dispatch, InboundVatMessage, OutboundVatMessage, Syscall,
     VatArgSlot, VatCapData, VatExportID, VatImportID, VatName, VatPromiseID,
-    VatSendTarget,
+    VatResolverID, VatSendTarget,
 };
 use std::cell::RefCell;
 use std::rc::Rc;
@@ -37,6 +37,14 @@ impl Dispatch for Vat1Dispatch {
                     message.args.slots,
                     vec![VatArgSlot::Export(VatExportID(22))]
                 );
+                assert_eq!(message.resolver, Some(VatResolverID(0)));
+                let arg2 = VatArgSlot::Export(VatExportID(23));
+                let res = VatCapData {
+                    body: b"result".to_vec(),
+                    slots: vec![arg2],
+                };
+                self.syscall.fulfill_to_data(message.resolver.unwrap(), res);
+                println!(" did fulfill_to_data");
                 self.log.borrow_mut().push(2);
             }
             _ => panic!("unknown target {}", target),
@@ -44,9 +52,12 @@ impl Dispatch for Vat1Dispatch {
     }
 
     fn notify_fulfill_to_target(&mut self, id: VatPromiseID, target: VatSendTarget) {
-        println!("Vat1.notifyResolveToTarget {} {}", id, target);
+        println!("Vat1.notify_fulfill_to_target {} {}", id, target);
     }
-    fn notify_fulfill_to_data(&mut self, _id: VatPromiseID, _data: VatCapData) {}
+    fn notify_fulfill_to_data(&mut self, id: VatPromiseID, data: VatCapData) {
+        println!("Vat1.notify_fulfill_to_data {} {:?}", id, data);
+        self.log.borrow_mut().push(3);
+    }
     fn notify_reject(&mut self, _id: VatPromiseID, _data: VatCapData) {}
 }
 
@@ -74,11 +85,17 @@ fn test_build() {
     c.start();
     c.dump();
 
-    println!("calling c.step");
+    println!("\ncalling c.step");
     c.step();
-    c.dump();
     assert_eq!(*r.borrow(), vec![1]);
 
+    c.dump();
+    println!("\ncalling c.step");
     c.step();
     assert_eq!(*r.borrow(), vec![1, 2]);
+
+    c.dump();
+    println!("\ncalling c.step");
+    c.step();
+    assert_eq!(*r.borrow(), vec![1, 2, 3]);
 }

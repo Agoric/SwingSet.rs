@@ -2,8 +2,8 @@ use super::clist::{CList, CListKernelEntry, CListVatEntry};
 use super::config::Config;
 use super::dispatch::Dispatch;
 use super::kernel_types::{
-    KernelArgSlot, KernelExport, KernelExportID, KernelMessage, KernelPromiseResolverID,
-    VatID, VatName,
+    KernelArgSlot, KernelCapData, KernelExport, KernelExportID, KernelMessage,
+    KernelPromiseResolverID, VatID, VatName,
 };
 use super::promise::KernelPromise;
 use super::vat::VatSyscall;
@@ -40,9 +40,14 @@ pub(crate) enum PendingDelivery {
         message: KernelMessage,
     },
     DeliverPromise {
-        vat: VatID,
+        vat_id: VatID,
         target: KernelPromiseResolverID,
         message: KernelMessage,
+    },
+    NotifyFulfillToData {
+        vat_id: VatID,
+        target: KernelPromiseResolverID,
+        data: KernelCapData,
     },
     // notify*
 }
@@ -71,6 +76,13 @@ impl VatData {
                 VatArgSlot::Promise(self.promise_clist.map_inbound(kp))
             }
         }
+    }
+
+    pub fn map_inbound_promise(
+        &mut self,
+        kprid: KernelPromiseResolverID,
+    ) -> VatPromiseID {
+        self.promise_clist.map_inbound(kprid)
     }
 
     pub fn map_inbound_resolver(
@@ -220,6 +232,29 @@ impl Kernel {
                 dispatch.deliver(veid, vmsg);
             }
             //PendingDelivery::DeliverPromise(..) => {}
+            PendingDelivery::NotifyFulfillToData {
+                vat_id,
+                target,
+                data: kdata,
+            } => {
+                println!("pd::nftd");
+                let (vdata, vpid) = {
+                    let mut kd = self.kd.borrow_mut();
+                    let vd = kd.vat_data.get_mut(&vat_id).unwrap();
+                    let vdata = VatCapData {
+                        body: kdata.body,
+                        slots: kdata
+                            .slots
+                            .into_iter()
+                            .map(|slot| vd.map_inbound_arg_slot(slot))
+                            .collect(),
+                    };
+                    let vpid = vd.map_inbound_promise(target);
+                    (vdata, vpid)
+                };
+                let dispatch = self.vat_dispatch.get_mut(&vat_id).unwrap();
+                dispatch.notify_fulfill_to_data(vpid, vdata);
+            }
             _ => panic!(),
         };
     }

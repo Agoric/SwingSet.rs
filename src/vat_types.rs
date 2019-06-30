@@ -86,7 +86,7 @@ impl From<VatSendTarget> for VatArgSlot {
     }
 }
 
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub struct VatCapData {
     pub body: Vec<u8>,
     pub slots: Vec<VatArgSlot>,

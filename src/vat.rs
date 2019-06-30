@@ -80,11 +80,14 @@ impl VatSyscall {
 
     fn allocate_result_promise(
         &self,
-        vat_id: VatID,
+        sender: VatID,
+        receiver: VatID,
     ) -> (VatPromiseID, KernelPromiseResolverID) {
+        let mut subscribers = HashSet::new();
+        subscribers.insert(sender);
         let p = KernelPromise::Unresolved {
-            subscribers: HashSet::new(),
-            decider: vat_id,
+            subscribers,
+            decider: receiver,
         };
         self.allocate_promise(p)
     }
@@ -125,6 +128,17 @@ impl VatSyscall {
         }
     }
 
+    fn map_outbound_capdata(&self, vdata: VatCapData) -> KernelCapData {
+        KernelCapData {
+            body: vdata.body,
+            slots: vdata
+                .slots
+                .into_iter()
+                .map(|slot| self.map_outbound_arg_slot(slot))
+                .collect(),
+        }
+    }
+
     fn map_outbound_message(
         &self,
         vmsg: OutboundVatMessage,
@@ -132,15 +146,7 @@ impl VatSyscall {
     ) -> KernelMessage {
         KernelMessage {
             name: vmsg.name.to_string(),
-            args: KernelCapData {
-                body: vmsg.args.body,
-                slots: vmsg
-                    .args
-                    .slots
-                    .into_iter()
-                    .map(|slot| self.map_outbound_arg_slot(slot))
-                    .collect(),
-            },
+            args: self.map_outbound_capdata(vmsg.args),
             resolver: okprid,
         }
     }
@@ -168,8 +174,8 @@ impl VatSyscall {
             (None, None)
         } else {
             let (vpid, kprid) = match tc {
-                Export(ke) => self.allocate_result_promise(ke.0),
-                Promise(vat_id, _) => self.allocate_result_promise(vat_id),
+                Export(ke) => self.allocate_result_promise(self.vat_id, ke.0),
+                Promise(decider, _) => self.allocate_result_promise(self.vat_id, decider),
                 ToDataError => self.send_data_error_promise(),
                 Rejected(ref d) => self.send_rejected_error_promise(d),
             };
@@ -192,7 +198,7 @@ impl VatSyscall {
             Promise(vat_id, kprid) => {
                 let kmsg = self.map_outbound_message(vmsg, okprid);
                 let pd = DeliverPromise {
-                    vat: vat_id,
+                    vat_id,
                     target: kprid,
                     message: kmsg,
                 };
@@ -234,9 +240,44 @@ impl Syscall for VatSyscall {
     fn fulfill_to_target(&mut self, _resolver: VatResolverID, _target: VatExportID) {
         panic!();
     }
-    fn fulfill_to_data(&mut self, _resolver: VatResolverID, _data: VatCapData) {
-        panic!();
+
+    fn fulfill_to_data(&mut self, resolver: VatResolverID, vdata: VatCapData) {
+        use KernelPromise::{FulfilledToData, Unresolved};
+        use PendingDelivery::NotifyFulfillToData;
+        let kdata = self.map_outbound_capdata(vdata);
+        let mut kd = self.kd.borrow_mut();
+        let vd = kd.vat_data.get_mut(&self.vat_id).unwrap();
+        let kprid = vd.map_outbound_resolver(resolver);
+
+        let notifications: Vec<PendingDelivery> = {
+            let p = kd.promises.get(&kprid).unwrap();
+            if let Unresolved {
+                subscribers,
+                decider,
+            } = p
+            {
+                // resolvers are not transferrable
+                assert_eq!(*decider, self.vat_id);
+                // TODO: HashSet.iter is nondeterministic
+                subscribers
+                    .iter()
+                    .map(|s| NotifyFulfillToData {
+                        vat_id: *s,
+                        target: kprid,
+                        data: kdata.clone(),
+                    })
+                    .collect()
+            } else {
+                panic!(); // TODO: DuplicateFulfillError
+            }
+        };
+        kd.run_queue.0.extend(notifications);
+
+        let new_promise = FulfilledToData(kdata.clone());
+        kd.promises.remove(&kprid);
+        kd.promises.insert(kprid, new_promise);
     }
+
     fn reject(&mut self, _resolver: VatResolverID, _data: VatCapData) {
         panic!();
     }

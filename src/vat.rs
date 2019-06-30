@@ -125,6 +125,26 @@ impl VatSyscall {
         }
     }
 
+    fn map_outbound_message(
+        &self,
+        vmsg: OutboundVatMessage,
+        okprid: Option<KernelPromiseResolverID>,
+    ) -> KernelMessage {
+        KernelMessage {
+            name: vmsg.name.to_string(),
+            args: KernelCapData {
+                body: vmsg.args.body,
+                slots: vmsg
+                    .args
+                    .slots
+                    .into_iter()
+                    .map(|slot| self.map_outbound_arg_slot(slot))
+                    .collect(),
+            },
+            resolver: okprid,
+        }
+    }
+
     fn do_send(
         &mut self,
         vtarget: VatSendTarget,
@@ -157,45 +177,31 @@ impl VatSyscall {
         };
 
         // now that we have the result promise, build the KernelMessage
-        // around it, if necessary
+        // around it, if necessary, and push it onto the run queue
 
-        let okmsg: Option<KernelMessage> = match tc {
-            Export(..) | Promise(..) => Some(KernelMessage {
-                name: vmsg.name.to_string(),
-                args: KernelCapData {
-                    body: vmsg.args.body,
-                    slots: vmsg
-                        .args
-                        .slots
-                        .into_iter()
-                        .map(|slot| self.map_outbound_arg_slot(slot))
-                        .collect(),
-                },
-                resolver: okprid,
-            }),
-            ToDataError | Rejected(..) => None,
-        };
-
-        // if we have a message to deliver, push it
-        if let Some(message) = okmsg {
-            println!(" pushing kt: {}.{}", ktarget, message.name);
-            use PendingDelivery::*;
-            let pd = match tc {
-                Export(ke) => Deliver {
+        use PendingDelivery::*;
+        match tc {
+            Export(ke) => {
+                let kmsg = self.map_outbound_message(vmsg, okprid);
+                let pd = Deliver {
                     target: ke,
-                    message,
-                },
-                Promise(vat_id, kprid) => DeliverPromise {
+                    message: kmsg,
+                };
+                self.kd.borrow_mut().run_queue.0.push_back(pd);
+            }
+            Promise(vat_id, kprid) => {
+                let kmsg = self.map_outbound_message(vmsg, okprid);
+                let pd = DeliverPromise {
                     vat: vat_id,
                     target: kprid,
-                    message,
-                },
-                _ => panic!(),
-            };
-            self.kd.borrow_mut().run_queue.0.push_back(pd);
-        }
+                    message: kmsg,
+                };
+                self.kd.borrow_mut().run_queue.0.push_back(pd);
+            }
+            ToDataError | Rejected(..) => (),
+        };
 
-        // and return the result promise (or None if send_only)
+        // and finally return the result promise (or None if send_only)
         ovpid
     }
 }

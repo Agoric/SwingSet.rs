@@ -210,6 +210,36 @@ impl VatSyscall {
         // and finally return the result promise (or None if send_only)
         ovpid
     }
+
+    fn push_notify_fulfill_to_target(
+        &mut self,
+        vat_id: VatID,
+        kprid: KernelPromiseResolverID,
+        ktarget: KernelExport,
+    ) {
+        let notification = PendingDelivery::NotifyFulfillToTarget {
+            vat_id,
+            target: kprid,
+            result: ktarget,
+        };
+        let mut kd = self.kd.borrow_mut();
+        kd.run_queue.0.push_back(notification);
+    }
+
+    fn push_notify_fulfill_to_data(
+        &mut self,
+        vat_id: VatID,
+        kprid: KernelPromiseResolverID,
+        data: KernelCapData,
+    ) {
+        let notification = PendingDelivery::NotifyFulfillToData {
+            vat_id,
+            target: kprid,
+            data: data.clone(),
+        };
+        let mut kd = self.kd.borrow_mut();
+        kd.run_queue.0.push_back(notification);
+    }
 }
 
 impl Syscall for VatSyscall {
@@ -254,77 +284,67 @@ impl Syscall for VatSyscall {
 
     fn fulfill_to_target(&mut self, resolver: VatResolverID, vtarget: VatResolveTarget) {
         use KernelPromise::{FulfilledToTarget, Unresolved};
-        use PendingDelivery::NotifyFulfillToTarget;
 
-        let mut kd = self.kd.borrow_mut();
-        let vd = kd.vat_data.get_mut(&self.vat_id).unwrap();
-        let kprid = vd.map_outbound_resolver(resolver);
-        let ktarget = vd.map_outbound_resolve_target(vtarget);
-
-        let notifications: Vec<PendingDelivery> = {
+        let kprid: KernelPromiseResolverID;
+        let ktarget: KernelExport;
+        let subscribers: Vec<VatID>;
+        {
+            let mut kd = self.kd.borrow_mut();
+            let vd = kd.vat_data.get_mut(&self.vat_id).unwrap();
+            kprid = vd.map_outbound_resolver(resolver);
+            ktarget = vd.map_outbound_resolve_target(vtarget);
             let p = kd.promises.get(&kprid).unwrap();
             if let Unresolved {
-                subscribers,
+                subscribers: subs,
                 decider,
             } = p
             {
                 // resolvers are not transferrable
                 assert_eq!(*decider, self.vat_id);
                 // TODO: HashSet.iter is nondeterministic
-                subscribers
-                    .iter()
-                    .map(|s| NotifyFulfillToTarget {
-                        vat_id: *s,
-                        target: kprid,
-                        result: ktarget,
-                    })
-                    .collect()
+                subscribers = subs.iter().map(|s| s.clone()).collect();
             } else {
                 panic!(); // TODO: DuplicateFulfillError
             }
+            let new_promise = FulfilledToTarget(ktarget);
+            kd.promises.remove(&kprid);
+            kd.promises.insert(kprid, new_promise);
         };
-        kd.run_queue.0.extend(notifications);
 
-        let new_promise = FulfilledToTarget(ktarget);
-        kd.promises.remove(&kprid);
-        kd.promises.insert(kprid, new_promise);
+        for s in subscribers {
+            self.push_notify_fulfill_to_target(s, kprid, ktarget);
+        }
     }
 
     fn fulfill_to_data(&mut self, resolver: VatResolverID, vdata: VatCapData) {
         use KernelPromise::{FulfilledToData, Unresolved};
-        use PendingDelivery::NotifyFulfillToData;
         let kdata = self.map_outbound_capdata(vdata);
-        let mut kd = self.kd.borrow_mut();
-        let vd = kd.vat_data.get_mut(&self.vat_id).unwrap();
-        let kprid = vd.map_outbound_resolver(resolver);
-
-        let notifications: Vec<PendingDelivery> = {
+        let kprid: KernelPromiseResolverID;
+        let subscribers: Vec<VatID>;
+        {
+            let mut kd = self.kd.borrow_mut();
+            let vd = kd.vat_data.get_mut(&self.vat_id).unwrap();
+            kprid = vd.map_outbound_resolver(resolver);
             let p = kd.promises.get(&kprid).unwrap();
             if let Unresolved {
-                subscribers,
+                subscribers: subs,
                 decider,
             } = p
             {
                 // resolvers are not transferrable
                 assert_eq!(*decider, self.vat_id);
                 // TODO: HashSet.iter is nondeterministic
-                subscribers
-                    .iter()
-                    .map(|s| NotifyFulfillToData {
-                        vat_id: *s,
-                        target: kprid,
-                        data: kdata.clone(),
-                    })
-                    .collect()
+                subscribers = subs.iter().map(|s| s.clone()).collect();
             } else {
                 panic!(); // TODO: DuplicateFulfillError
             }
+            let new_promise = FulfilledToData(kdata.clone());
+            kd.promises.remove(&kprid);
+            kd.promises.insert(kprid, new_promise);
         };
-        kd.run_queue.0.extend(notifications);
-
-        let new_promise = FulfilledToData(kdata.clone());
-        kd.promises.remove(&kprid);
-        kd.promises.insert(kprid, new_promise);
+        for s in subscribers {
+            self.push_notify_fulfill_to_data(s, kprid, kdata.clone());
+        }
     }
 
     fn reject(&mut self, _resolver: VatResolverID, _data: VatCapData) {

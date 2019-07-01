@@ -239,8 +239,22 @@ impl Syscall for VatSyscall {
         (vpid, vrid)
     }
 
-    fn subscribe(&mut self, _id: VatPromiseID) {
-        panic!();
+    fn subscribe(&mut self, vpid: VatPromiseID) {
+        let mut kd = self.kd.borrow_mut();
+        let vd = kd.vat_data.get_mut(&self.vat_id).unwrap();
+        let kprid = vd.promise_clist.map_outbound(vpid);
+        let p: &mut KernelPromise = kd.promises.get_mut(&kprid).unwrap();
+        use KernelPromise::*;
+        match p {
+            Unresolved {
+                ref mut subscribers,
+                ..
+            } => subscribers.insert(self.vat_id),
+            _ => panic!("not implemented yet"),
+            /*FulfilledToTarget(..) => notify1(),
+            FulfilledToData(..) => notify2(),
+            Rejected(..) => notify3(),*/
+        };
     }
 
     fn fulfill_to_target(&mut self, resolver: VatResolverID, vtarget: VatResolveTarget) {

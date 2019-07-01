@@ -18,5 +18,5 @@ pub use kernel_types::VatName;
 pub use syscall::Syscall;
 pub use vat_types::{
     InboundVatMessage, OutboundVatMessage, VatArgSlot, VatCapData, VatExportID,
-    VatImportID, VatPromiseID, VatResolverID, VatSendTarget,
+    VatImportID, VatPromiseID, VatResolveTarget, VatResolverID, VatSendTarget,
 };

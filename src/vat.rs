@@ -6,8 +6,8 @@ use super::kernel_types::{
 use super::promise::KernelPromise;
 use super::syscall::Syscall;
 use super::vat_types::{
-    OutboundVatMessage, VatArgSlot, VatCapData, VatExportID, VatPromiseID, VatResolverID,
-    VatSendTarget,
+    OutboundVatMessage, VatArgSlot, VatCapData, VatExportID, VatPromiseID,
+    VatResolveTarget, VatResolverID, VatSendTarget,
 };
 use std::cell::RefCell;
 use std::collections::HashSet;
@@ -44,6 +44,11 @@ impl VatSyscall {
                 KernelTarget::Promise(kpid)
             }
         }
+    }
+
+    fn map_outbound_export(&self, veid: VatExportID) -> KernelExport {
+        let keid = KernelExportID(veid.0);
+        KernelExport(self.vat_id, keid)
     }
 
     fn classify_target(&self, ktarget: KernelTarget) -> TargetCategory {
@@ -237,8 +242,43 @@ impl Syscall for VatSyscall {
     fn subscribe(&mut self, _id: VatPromiseID) {
         panic!();
     }
-    fn fulfill_to_target(&mut self, _resolver: VatResolverID, _target: VatExportID) {
-        panic!();
+
+    fn fulfill_to_target(&mut self, resolver: VatResolverID, vtarget: VatResolveTarget) {
+        use KernelPromise::{FulfilledToTarget, Unresolved};
+        use PendingDelivery::NotifyFulfillToTarget;
+
+        let mut kd = self.kd.borrow_mut();
+        let vd = kd.vat_data.get_mut(&self.vat_id).unwrap();
+        let kprid = vd.map_outbound_resolver(resolver);
+        let ktarget = vd.map_outbound_resolve_target(vtarget);
+
+        let notifications: Vec<PendingDelivery> = {
+            let p = kd.promises.get(&kprid).unwrap();
+            if let Unresolved {
+                subscribers,
+                decider,
+            } = p
+            {
+                // resolvers are not transferrable
+                assert_eq!(*decider, self.vat_id);
+                // TODO: HashSet.iter is nondeterministic
+                subscribers
+                    .iter()
+                    .map(|s| NotifyFulfillToTarget {
+                        vat_id: *s,
+                        target: kprid,
+                        result: ktarget,
+                    })
+                    .collect()
+            } else {
+                panic!(); // TODO: DuplicateFulfillError
+            }
+        };
+        kd.run_queue.0.extend(notifications);
+
+        let new_promise = FulfilledToTarget(ktarget);
+        kd.promises.remove(&kprid);
+        kd.promises.insert(kprid, new_promise);
     }
 
     fn fulfill_to_data(&mut self, resolver: VatResolverID, vdata: VatCapData) {

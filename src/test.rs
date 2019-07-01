@@ -1,7 +1,7 @@
 use super::{
     Config, Controller, Dispatch, InboundVatMessage, OutboundVatMessage, Syscall,
     VatArgSlot, VatCapData, VatExportID, VatImportID, VatName, VatPromiseID,
-    VatResolverID, VatSendTarget,
+    VatResolveTarget, VatResolverID, VatSendTarget,
 };
 use std::cell::RefCell;
 use std::rc::Rc;
@@ -51,8 +51,8 @@ impl Dispatch for Vat1Dispatch {
         };
     }
 
-    fn notify_fulfill_to_target(&mut self, id: VatPromiseID, target: VatSendTarget) {
-        println!("Vat1.notify_fulfill_to_target {} {}", id, target);
+    fn notify_fulfill_to_target(&mut self, id: VatPromiseID, target: VatResolveTarget) {
+        println!("Vat1.notify_fulfill_to_target {} {:?}", id, target);
     }
     fn notify_fulfill_to_data(&mut self, id: VatPromiseID, data: VatCapData) {
         println!("Vat1.notify_fulfill_to_data {} {:?}", id, data);

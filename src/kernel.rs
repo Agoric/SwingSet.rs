@@ -9,7 +9,7 @@ use super::promise::KernelPromise;
 use super::vat::VatSyscall;
 use super::vat_types::{
     InboundVatMessage, VatArgSlot, VatCapData, VatExportID, VatImportID, VatPromiseID,
-    VatResolverID,
+    VatResolveTarget, VatResolverID,
 };
 use std::cell::RefCell;
 use std::collections::{HashMap, VecDeque};
@@ -49,7 +49,11 @@ pub(crate) enum PendingDelivery {
         target: KernelPromiseResolverID,
         data: KernelCapData,
     },
-    // notify*
+    NotifyFulfillToTarget {
+        vat_id: VatID,
+        target: KernelPromiseResolverID,
+        result: KernelExport,
+    }, // notify*
 }
 
 pub(crate) struct VatData {
@@ -59,6 +63,34 @@ pub(crate) struct VatData {
     pub(crate) resolver_clist: CList<KernelPromiseResolverID, VatResolverID>,
 }
 impl VatData {
+    // it's totally legit for vat A to hold a promise, vat B resolves
+    // it to one of vat A's exports. Or to vatB's exports, or somebody else's
+    // export. So the 'result' in vatA.notify_fulfill_to_target is either a
+    // VatExportID or a VatImportID, and we need a new enum to hold that.
+    fn map_inbound_resolve_target(&mut self, ktarget: KernelExport) -> VatResolveTarget {
+        if ktarget.0 == self.vat_id {
+            // the vat's own export, returning home
+            let keid: KernelExportID = ktarget.1;
+            VatResolveTarget::Export(VatExportID(keid.0))
+        } else {
+            // another vat's export, get/allocate in clist
+            let veid = self.import_clist.map_inbound(ktarget);
+            VatResolveTarget::Import(veid)
+        }
+    }
+
+    pub fn map_outbound_resolve_target(
+        &mut self,
+        vtarget: VatResolveTarget,
+    ) -> KernelExport {
+        match vtarget {
+            VatResolveTarget::Export(VatExportID(id)) => {
+                KernelExport(self.vat_id, KernelExportID(id))
+            }
+            VatResolveTarget::Import(viid) => self.import_clist.map_outbound(viid),
+        }
+    }
+
     pub fn map_inbound_arg_slot(&mut self, slot: KernelArgSlot) -> VatArgSlot {
         match slot {
             KernelArgSlot::Export(ke) => {
@@ -254,6 +286,21 @@ impl Kernel {
                 };
                 let dispatch = self.vat_dispatch.get_mut(&vat_id).unwrap();
                 dispatch.notify_fulfill_to_data(vpid, vdata);
+            }
+            PendingDelivery::NotifyFulfillToTarget {
+                vat_id,
+                target,
+                result,
+            } => {
+                let (vpid, vrt) = {
+                    let mut kd = self.kd.borrow_mut();
+                    let vd = kd.vat_data.get_mut(&vat_id).unwrap();
+                    let vpid = vd.map_inbound_promise(target);
+                    let vrt = vd.map_inbound_resolve_target(result);
+                    (vpid, vrt)
+                };
+                let dispatch = self.vat_dispatch.get_mut(&vat_id).unwrap();
+                dispatch.notify_fulfill_to_target(vpid, vrt);
             }
             _ => panic!(),
         };

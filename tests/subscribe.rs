@@ -13,33 +13,44 @@ struct Vat1Dispatch {
     r: Option<VatResolverID>,
 }
 impl Dispatch for Vat1Dispatch {
-    fn deliver(&mut self, target: VatExportID, _message: InboundVatMessage) -> () {
-        println!("Vat1.deliver {}", target);
-        match target {
-            VatExportID(0) => {
-                println!(" deliver[bootstrap.0]");
-                let (p, r) = self.syscall.allocate_promise_and_resolver();
-                self.r = Some(r);
-                let t = VatSendTarget::Import(VatImportID(1));
-                let arg1 = VatArgSlot::Promise(p);
-                let vmsg = OutboundVatMessage::new("have_promise", b"body", vec![arg1]);
-                self.syscall.send_only(t, vmsg);
-                self.log.borrow_mut().push(1);
-            }
+    fn deliver(&mut self, target: VatExportID, message: InboundVatMessage) -> () {
+        println!("Vat1.deliver {} .{}", target, message.name);
+        assert_eq!(target, VatExportID(0), "unexpected target");
 
-            VatExportID(2) => {
-                println!(" deliver[bootstrap.2]");
-                let slot0 = VatArgSlot::Export(VatExportID(10));
-                let slot1 = VatArgSlot::Import(VatImportID(1));
-                let data = VatCapData {
-                    body: b"p2data".to_vec(),
-                    slots: vec![slot0, slot1],
-                };
-                self.syscall.fulfill_to_data(self.r.unwrap(), data);
-                self.log.borrow_mut().push(3);
-            }
-            _ => panic!("unknown target {}", target),
-        };
+        if message.name == "bootstrap" {
+            let (p, r) = self.syscall.allocate_promise_and_resolver();
+            self.r = Some(r);
+            let t = VatSendTarget::Import(VatImportID(1));
+            let arg1 = VatArgSlot::Promise(p);
+            let vmsg = OutboundVatMessage::new("have_promise", b"body", vec![arg1]);
+            self.syscall.send_only(t, vmsg);
+            self.log.borrow_mut().push(1);
+        } else if message.name == "resolve_data" {
+            let slot0 = VatArgSlot::Export(VatExportID(10));
+            let slot1 = VatArgSlot::Import(VatImportID(1));
+            let data = VatCapData {
+                body: b"p2data".to_vec(),
+                slots: vec![slot0, slot1],
+            };
+            self.syscall.fulfill_to_data(self.r.unwrap(), data);
+            self.log.borrow_mut().push(3);
+        } else if message.name == "resolve_target" {
+            let slot0 = VatResolveTarget::Export(VatExportID(10));
+            //let slot1 = VatResolveTarget::Import(VatImportID(1));
+            self.syscall.fulfill_to_target(self.r.unwrap(), slot0);
+            self.log.borrow_mut().push(3);
+        } else if message.name == "reject" {
+            let slot0 = VatArgSlot::Export(VatExportID(10));
+            let slot1 = VatArgSlot::Import(VatImportID(1));
+            let data = VatCapData {
+                body: b"p2data".to_vec(),
+                slots: vec![slot0, slot1],
+            };
+            self.syscall.reject(self.r.unwrap(), data);
+            self.log.borrow_mut().push(3);
+        } else {
+            panic!("unknown target {}", target);
+        }
     }
 
     fn notify_fulfill_to_target(&mut self, _id: VatPromiseID, _target: VatResolveTarget) {
@@ -60,27 +71,32 @@ struct Vat2Dispatch {
 }
 impl Dispatch for Vat2Dispatch {
     fn deliver(&mut self, target: VatExportID, message: InboundVatMessage) -> () {
-        println!("Vat1.deliver {}", target);
-        match target {
-            VatExportID(0) => {
-                println!(" deliver[vat2.0]");
-                assert_eq!(message.name, "have_promise");
-                if let VatArgSlot::Promise(p) = message.args.slots[0] {
-                    self.p = Some(p);
-                } else {
-                    println!("args.slots[0] was not a Promise: {:?}", message.args.slots);
-                    panic!("args.slots[0] was not a Promise");
-                }
-                self.syscall.subscribe(self.p.unwrap());
-                self.log.borrow_mut().push(2);
+        println!("Vat2.deliver {} .{}", target, message.name);
+        assert_eq!(target, VatExportID(0), "unexpected target");
+
+        if message.name == "have_promise" {
+            if let VatArgSlot::Promise(p) = message.args.slots[0] {
+                self.p = Some(p);
+            } else {
+                println!("args.slots[0] was not a Promise: {:?}", message.args.slots);
+                panic!("args.slots[0] was not a Promise");
             }
-            _ => panic!("unknown target {}", target),
-        };
+            self.syscall.subscribe(self.p.unwrap());
+            self.log.borrow_mut().push(2);
+        } else {
+            panic!("unknown target {}", target);
+        }
     }
-    fn notify_fulfill_to_target(&mut self, _id: VatPromiseID, _target: VatResolveTarget) {
+
+    fn notify_fulfill_to_target(&mut self, id: VatPromiseID, target: VatResolveTarget) {
+        println!("Vat2.notify_fulfill_to_target {} {:?}", id, target);
+        assert_eq!(id, self.p.unwrap());
+        assert_eq!(target, VatResolveTarget::Import(VatImportID(0)));
+        self.log.borrow_mut().push(41);
     }
+
     fn notify_fulfill_to_data(&mut self, id: VatPromiseID, data: VatCapData) {
-        println!("Vat1.notify_fulfill_to_data {} {:?}", id, data);
+        println!("Vat2.notify_fulfill_to_data {} {:?}", id, data);
         assert_eq!(id, self.p.unwrap());
         assert_eq!(data.body, b"p2data");
         assert_eq!(
@@ -90,15 +106,25 @@ impl Dispatch for Vat2Dispatch {
                 VatArgSlot::Export(VatExportID(0)),
             ]
         );
-        self.log.borrow_mut().push(4);
+        self.log.borrow_mut().push(40);
     }
-    fn notify_reject(&mut self, _id: VatPromiseID, _data: VatCapData) {
-        panic!()
+
+    fn notify_reject(&mut self, id: VatPromiseID, data: VatCapData) {
+        println!("Vat2.notify_reject {} {:?}", id, data);
+        assert_eq!(id, self.p.unwrap());
+        assert_eq!(data.body, b"p2data");
+        assert_eq!(
+            data.slots,
+            vec![
+                VatArgSlot::Import(VatImportID(0)),
+                VatArgSlot::Export(VatExportID(0)),
+            ]
+        );
+        self.log.borrow_mut().push(42);
     }
 }
 
-#[test]
-fn test_subscribe_unresolved() {
+fn do_test_subscribe_unresolved(mode: &str, expected_log: u32) {
     let mut cfg = Config::new();
     let log: Vec<u32> = vec![];
     let r = Rc::new(RefCell::new(log));
@@ -128,27 +154,33 @@ fn test_subscribe_unresolved() {
 
     let mut c = Controller::new(cfg);
     c.add_import(&vn, 1, &vn2, 0);
-    //println!("controller: {:?}", c);
-    println!("controller created");
     c.start();
-    c.dump();
 
-    println!("\ncalling c.step");
     c.step();
     assert_eq!(*r.borrow(), vec![1]);
 
-    c.dump();
-    println!("\ncalling c.step");
     c.step();
     assert_eq!(*r.borrow(), vec![1, 2]);
 
-    c.push("bootstrap", 2, "method", b"body");
-    c.dump();
-    println!("\ncalling c.step");
+    c.push("bootstrap", 0, mode, b"body");
     c.step();
     assert_eq!(*r.borrow(), vec![1, 2, 3]);
 
-    c.dump();
     c.step();
-    assert_eq!(*r.borrow(), vec![1, 2, 3, 4]);
+    assert_eq!(*r.borrow(), vec![1, 2, 3, expected_log]);
+}
+
+#[test]
+fn test_subscribe_unresolved_data() {
+    do_test_subscribe_unresolved("resolve_data", 40);
+}
+
+#[test]
+fn test_subscribe_unresolved_target() {
+    do_test_subscribe_unresolved("resolve_target", 41);
+}
+
+#[test]
+fn test_subscribe_unresolved_reject() {
+    do_test_subscribe_unresolved("reject", 42);
 }

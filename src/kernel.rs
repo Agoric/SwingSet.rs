@@ -292,6 +292,7 @@ impl Kernel {
                 let dispatch = self.vat_dispatch.get_mut(&vat_id).unwrap();
                 dispatch.notify_fulfill_to_data(vpid, vdata);
             }
+
             PendingDelivery::NotifyFulfillToTarget {
                 vat_id,
                 target,
@@ -306,6 +307,29 @@ impl Kernel {
                 };
                 let dispatch = self.vat_dispatch.get_mut(&vat_id).unwrap();
                 dispatch.notify_fulfill_to_target(vpid, vrt);
+            }
+
+            PendingDelivery::NotifyReject {
+                vat_id,
+                target,
+                data: kdata,
+            } => {
+                let (vdata, vpid) = {
+                    let mut kd = self.kd.borrow_mut();
+                    let vd = kd.vat_data.get_mut(&vat_id).unwrap();
+                    let vdata = VatCapData {
+                        body: kdata.body,
+                        slots: kdata
+                            .slots
+                            .into_iter()
+                            .map(|slot| vd.map_inbound_arg_slot(slot))
+                            .collect(),
+                    };
+                    let vpid = vd.map_inbound_promise(target);
+                    (vdata, vpid)
+                };
+                let dispatch = self.vat_dispatch.get_mut(&vat_id).unwrap();
+                dispatch.notify_reject(vpid, vdata);
             }
             _ => panic!(),
         };

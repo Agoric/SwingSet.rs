@@ -6,8 +6,8 @@ use super::kernel_types::{
 use super::promise::KernelPromise;
 use super::syscall::Syscall;
 use super::vat_types::{
-    OutboundVatMessage, VatArgSlot, VatCapData, VatExportID, VatPromiseID,
-    VatResolveTarget, VatResolverID, VatSendTarget,
+    OutboundVatMessage, VatArgSlot, VatCapData, VatPromiseID, VatResolveTarget,
+    VatResolverID, VatSendTarget,
 };
 use std::cell::RefCell;
 use std::collections::HashSet;
@@ -44,11 +44,6 @@ impl VatSyscall {
                 KernelTarget::Promise(kpid)
             }
         }
-    }
-
-    fn map_outbound_export(&self, veid: VatExportID) -> KernelExport {
-        let keid = KernelExportID(veid.0);
-        KernelExport(self.vat_id, keid)
     }
 
     fn classify_target(&self, ktarget: KernelTarget) -> TargetCategory {

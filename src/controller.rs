@@ -39,6 +39,21 @@ impl Controller {
         );
     }
 
+    pub fn push(&mut self, vat_name: &str, target: u32, method: &str, args_body: &[u8]) {
+        self.kernel.push(
+            &VatName(vat_name.to_string()),
+            KernelExportID(target),
+            KernelMessage {
+                name: method.to_string(),
+                args: KernelCapData {
+                    body: args_body.to_vec(),
+                    slots: vec![],
+                },
+                resolver: None,
+            },
+        );
+    }
+
     pub fn step(&mut self) {
         println!("controller.step");
         self.kernel.step();

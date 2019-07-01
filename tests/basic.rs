@@ -1,10 +1,10 @@
-use super::{
-    Config, Controller, Dispatch, InboundVatMessage, OutboundVatMessage, Syscall,
+use std::cell::RefCell;
+use std::rc::Rc;
+use swingset::{
+    Config, Controller, Dispatch, InboundVatMessage, OutboundVatMessage, Setup, Syscall,
     VatArgSlot, VatCapData, VatExportID, VatImportID, VatName, VatPromiseID,
     VatResolveTarget, VatResolverID, VatSendTarget,
 };
-use std::cell::RefCell;
-use std::rc::Rc;
 
 //#[derive(Debug)]
 struct Vat1Dispatch {
@@ -61,7 +61,6 @@ impl Dispatch for Vat1Dispatch {
     fn notify_reject(&mut self, _id: VatPromiseID, _data: VatCapData) {}
 }
 
-use super::config::Setup;
 #[test]
 fn test_build() {
     let mut cfg = Config::new();

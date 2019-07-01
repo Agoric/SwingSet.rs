@@ -53,7 +53,12 @@ pub(crate) enum PendingDelivery {
         vat_id: VatID,
         target: KernelPromiseResolverID,
         result: KernelExport,
-    }, // notify*
+    },
+    NotifyReject {
+        vat_id: VatID,
+        target: KernelPromiseResolverID,
+        data: KernelCapData,
+    },
 }
 
 pub(crate) struct VatData {

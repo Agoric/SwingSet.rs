@@ -240,6 +240,21 @@ impl VatSyscall {
         let mut kd = self.kd.borrow_mut();
         kd.run_queue.0.push_back(notification);
     }
+
+    fn push_notify_reject(
+        &mut self,
+        vat_id: VatID,
+        kprid: KernelPromiseResolverID,
+        data: KernelCapData,
+    ) {
+        let notification = PendingDelivery::NotifyReject {
+            vat_id,
+            target: kprid,
+            data: data.clone(),
+        };
+        let mut kd = self.kd.borrow_mut();
+        kd.run_queue.0.push_back(notification);
+    }
 }
 
 impl Syscall for VatSyscall {
@@ -347,9 +362,37 @@ impl Syscall for VatSyscall {
         }
     }
 
-    fn reject(&mut self, _resolver: VatResolverID, _data: VatCapData) {
-        panic!();
+    fn reject(&mut self, resolver: VatResolverID, vdata: VatCapData) {
+        use KernelPromise::{Rejected, Unresolved};
+        let kdata = self.map_outbound_capdata(vdata);
+        let kprid: KernelPromiseResolverID;
+        let subscribers: Vec<VatID>;
+        {
+            let mut kd = self.kd.borrow_mut();
+            let vd = kd.vat_data.get_mut(&self.vat_id).unwrap();
+            kprid = vd.map_outbound_resolver(resolver);
+            let p = kd.promises.get(&kprid).unwrap();
+            if let Unresolved {
+                subscribers: subs,
+                decider,
+            } = p
+            {
+                // resolvers are not transferrable
+                assert_eq!(*decider, self.vat_id);
+                // TODO: HashSet.iter is nondeterministic
+                subscribers = subs.iter().map(|s| s.clone()).collect();
+            } else {
+                panic!(); // TODO: DuplicateFulfillError
+            }
+            let new_promise = Rejected(kdata.clone());
+            kd.promises.remove(&kprid);
+            kd.promises.insert(kprid, new_promise);
+        };
+        for s in subscribers {
+            self.push_notify_reject(s, kprid, kdata.clone());
+        }
     }
+
     fn forward(&mut self, _resolver: VatResolverID, _target: VatPromiseID) {
         panic!();
     }

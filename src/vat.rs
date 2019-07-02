@@ -285,16 +285,32 @@ impl Syscall for VatSyscall {
         let kprid = vd.promise_clist.map_outbound(vpid);
         let p: &mut KernelPromise = kd.promises.get_mut(&kprid).unwrap();
         use KernelPromise::*;
-        match p {
+        use PendingDelivery::*;
+        let pd = match p {
             Unresolved {
                 ref mut subscribers,
                 ..
-            } => subscribers.insert(self.vat_id),
-            _ => panic!("not implemented yet"),
-            /*FulfilledToTarget(..) => notify1(),
-            FulfilledToData(..) => notify2(),
-            Rejected(..) => notify3(),*/
+            } => {
+                subscribers.insert(self.vat_id);
+                return;
+            }
+            FulfilledToTarget(ktarget) => NotifyFulfillToTarget {
+                vat_id: self.vat_id,
+                target: kprid,
+                result: *ktarget,
+            },
+            FulfilledToData(data) => NotifyFulfillToData {
+                vat_id: self.vat_id,
+                target: kprid,
+                data: data.clone(),
+            },
+            Rejected(data) => NotifyReject {
+                vat_id: self.vat_id,
+                target: kprid,
+                data: data.clone(),
+            },
         };
+        kd.run_queue.0.push_back(pd);
     }
 
     fn fulfill_to_target(&mut self, resolver: VatResolverID, vtarget: VatResolveTarget) {

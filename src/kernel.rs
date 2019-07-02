@@ -345,6 +345,12 @@ impl Kernel {
 
     pub fn run(&mut self) {
         println!("kernel.run");
+        loop {
+            if self.kd.borrow_mut().run_queue.0.is_empty() {
+                return;
+            }
+            self.step();
+        }
     }
 
     pub fn dump(&self) {

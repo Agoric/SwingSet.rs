@@ -10,6 +10,7 @@ use swingset::{
 struct Vat1Dispatch {
     syscall: Box<dyn Syscall>,
     log: Rc<RefCell<Vec<u32>>>,
+    p: Option<VatPromiseID>,
     r: Option<VatResolverID>,
 }
 impl Dispatch for Vat1Dispatch {
@@ -18,10 +19,14 @@ impl Dispatch for Vat1Dispatch {
         assert_eq!(target, VatExportID(0), "unexpected target");
 
         if message.name == "bootstrap" {
+            println!("in bootstrap");
             let (p, r) = self.syscall.allocate_promise_and_resolver();
+            self.p = Some(p);
             self.r = Some(r);
+            self.log.borrow_mut().push(0);
+        } else if message.name == "send_promise" {
             let t = VatSendTarget::Import(VatImportID(1));
-            let arg1 = VatArgSlot::Promise(p);
+            let arg1 = VatArgSlot::Promise(self.p.unwrap());
             let vmsg = OutboundVatMessage::new("have_promise", b"body", vec![arg1]);
             self.syscall.send_only(t, vmsg);
             self.log.borrow_mut().push(1);
@@ -134,6 +139,7 @@ fn do_test_subscribe_unresolved(mode: &str, expected_log: u32) {
         Box::new(Vat1Dispatch {
             syscall,
             log: r2,
+            p: None,
             r: None,
         })
     };
@@ -155,19 +161,17 @@ fn do_test_subscribe_unresolved(mode: &str, expected_log: u32) {
     let mut c = Controller::new(cfg);
     c.add_import(&vn, 1, &vn2, 0);
     c.start();
+    c.run();
+    assert_eq!(*r.borrow(), vec![0]);
 
-    c.step();
-    assert_eq!(*r.borrow(), vec![1]);
+    c.push("bootstrap", 0, "send_promise", b"body");
 
-    c.step();
-    assert_eq!(*r.borrow(), vec![1, 2]);
+    c.run();
+    assert_eq!(*r.borrow(), vec![0, 1, 2]);
 
     c.push("bootstrap", 0, mode, b"body");
-    c.step();
-    assert_eq!(*r.borrow(), vec![1, 2, 3]);
-
-    c.step();
-    assert_eq!(*r.borrow(), vec![1, 2, 3, expected_log]);
+    c.run();
+    assert_eq!(*r.borrow(), vec![0, 1, 2, 3, expected_log]);
 }
 
 #[test]
@@ -183,4 +187,64 @@ fn test_subscribe_unresolved_target() {
 #[test]
 fn test_subscribe_unresolved_reject() {
     do_test_subscribe_unresolved("reject", 42);
+}
+
+fn do_test_subscribe_resolved(mode: &str, expected_log: u32) {
+    let mut cfg = Config::new();
+    let log: Vec<u32> = vec![];
+    let r = Rc::new(RefCell::new(log));
+    let r2 = r.clone();
+    let vn = VatName("bootstrap".to_string());
+    let setup = |syscall| -> Box<dyn Dispatch> {
+        Box::new(Vat1Dispatch {
+            syscall,
+            log: r2,
+            p: None,
+            r: None,
+        })
+    };
+    let sb: Box<Setup> = Box::new(setup);
+    cfg.add_vat(&vn, sb);
+
+    let r3 = r.clone();
+    let setup2 = |syscall| -> Box<dyn Dispatch> {
+        Box::new(Vat2Dispatch {
+            syscall,
+            log: r3,
+            p: None,
+        })
+    };
+    let vn2 = VatName("vat2".to_string());
+    let sb2: Box<Setup> = Box::new(setup2);
+    cfg.add_vat(&vn2, sb2);
+
+    let mut c = Controller::new(cfg);
+    c.add_import(&vn, 1, &vn2, 0);
+    c.start();
+    c.run();
+    assert_eq!(*r.borrow(), vec![0]);
+
+    c.push("bootstrap", 0, mode, b"body");
+    c.run();
+    assert_eq!(*r.borrow(), vec![0, 3]);
+
+    c.push("bootstrap", 0, "send_promise", b"body");
+
+    c.run();
+    assert_eq!(*r.borrow(), vec![0, 3, 1, 2, expected_log]);
+}
+
+#[test]
+fn test_subscribe_fulfilled_to_target() {
+    do_test_subscribe_resolved("resolve_target", 41);
+}
+
+#[test]
+fn test_subscribe_fulfilled_to_data() {
+    do_test_subscribe_resolved("resolve_data", 40);
+}
+
+#[test]
+fn test_subscribe_rejected() {
+    do_test_subscribe_resolved("reject", 42);
 }

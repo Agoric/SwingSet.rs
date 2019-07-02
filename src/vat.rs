@@ -409,7 +409,83 @@ impl Syscall for VatSyscall {
         }
     }
 
-    fn forward(&mut self, _resolver: VatResolverID, _target: VatPromiseID) {
-        panic!();
+    fn forward(&mut self, resolver: VatResolverID, vtarget: VatPromiseID) {
+        use KernelPromise::*;
+
+        let mut kd = self.kd.borrow_mut();
+        let vd = kd.vat_data.get_mut(&self.vat_id).unwrap();
+        let old_id = vd.map_outbound_resolver(resolver);
+        let new_id = vd.get_outbound_promise(vtarget);
+
+        // the old promise (the one being replaced/forwarded/resolved) must
+        // be in the Unresolved state, and thus might have some subscribers
+        let old_subscribers: Vec<VatID>;
+        {
+            let old_promise = kd.promises.get(&old_id).unwrap();
+            match old_promise {
+                Unresolved {
+                    subscribers: subs,
+                    decider,
+                } => {
+                    // resolvers are not transferrable
+                    assert_eq!(*decider, self.vat_id);
+                    // TODO: HashSet.iter is nondeterministic
+                    old_subscribers = subs.iter().cloned().collect();
+                }
+                _ => panic!(), // TODO: DuplicateFulfillError
+            };
+        }
+        kd.promises.remove(&old_id);
+
+        // Walk through all clists and replace every mention of the old
+        // promise with the new target
+        for vd in kd.vat_data.values_mut() {
+            vd.forward_promise(old_id, new_id);
+        }
+
+        // The new promise might have already been fulfilled, so the old
+        // subscribers must be notified about the fulfillment. Or, if the new
+        // promise is still unresolved, make the old subscribers watch the
+        // new promise instead.
+        use PendingDelivery::*;
+        let new_promise = kd.promises.get_mut(&new_id).unwrap();
+        let pds: Vec<PendingDelivery> = match new_promise {
+            Unresolved {
+                subscribers: new_subscribers,
+                ..
+            } => {
+                for s in old_subscribers {
+                    new_subscribers.insert(s);
+                }
+                return;
+            }
+            FulfilledToTarget(ktarget) => old_subscribers
+                .iter()
+                .map(|s| NotifyFulfillToTarget {
+                    vat_id: *s,
+                    target: old_id,
+                    result: *ktarget,
+                })
+                .collect(),
+            FulfilledToData(data) => old_subscribers
+                .iter()
+                .map(|s| NotifyFulfillToData {
+                    vat_id: *s,
+                    target: old_id,
+                    data: data.clone(),
+                })
+                .collect(),
+            Rejected(data) => old_subscribers
+                .iter()
+                .map(|s| NotifyReject {
+                    vat_id: *s,
+                    target: old_id,
+                    data: data.clone(),
+                })
+                .collect(),
+        };
+        for pd in pds {
+            kd.run_queue.0.push_back(pd);
+        }
     }
 }

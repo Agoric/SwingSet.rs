@@ -121,6 +121,12 @@ impl VatData {
     ) -> VatPromiseID {
         self.promise_clist.map_inbound(kprid)
     }
+    pub fn get_outbound_promise(
+        &mut self,
+        vpid: VatPromiseID,
+    ) -> KernelPromiseResolverID {
+        self.promise_clist.get_outbound(vpid)
+    }
 
     pub fn get_inbound_resolver(
         &mut self,
@@ -140,6 +146,21 @@ impl VatData {
         vrid: VatResolverID,
     ) -> KernelPromiseResolverID {
         self.resolver_clist.map_outbound(vrid)
+    }
+
+    pub fn forward_promise(
+        &mut self,
+        old_id: KernelPromiseResolverID,
+        new_id: KernelPromiseResolverID,
+    ) {
+        let pc = &mut self.promise_clist;
+        if pc.inbound.contains_key(&old_id) {
+            let vpid = *pc.inbound.get(&old_id).unwrap();
+            assert!(pc.outbound.contains_key(&vpid));
+            pc.inbound.remove(&old_id);
+            pc.inbound.insert(new_id, vpid);
+            pc.outbound.insert(vpid, new_id);
+        }
     }
 }
 

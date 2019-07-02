@@ -9,8 +9,8 @@ pub(crate) trait CListKernelEntry: Eq + Hash + Copy {}
 
 #[derive(Debug, Default)]
 pub(crate) struct CList<KT: CListKernelEntry, VT: CListVatEntry> {
-    inbound: HashMap<KT, VT>,
-    outbound: HashMap<VT, KT>,
+    pub(crate) inbound: HashMap<KT, VT>,
+    pub(crate) outbound: HashMap<VT, KT>,
     next_index: u32,
 }
 impl<KT: CListKernelEntry, VT: CListVatEntry> CList<KT, VT> {
@@ -56,6 +56,16 @@ impl<KT: CListKernelEntry, VT: CListVatEntry> CList<KT, VT> {
             *vat_object
         } else {
             panic!("kernel object not already in table");
+        }
+    }
+
+    /// use this when the vat object being sent outbound (into the kernel)
+    /// must already exist in the table: no allocation
+    pub fn get_outbound(&mut self, vat_object: VT) -> KT {
+        if let Some(kernel_object) = self.outbound.get(&vat_object) {
+            *kernel_object
+        } else {
+            panic!("vat object not already in table");
         }
     }
 

@@ -317,7 +317,7 @@ impl Syscall for VatSyscall {
                 // resolvers are not transferrable
                 assert_eq!(*decider, self.vat_id);
                 // TODO: HashSet.iter is nondeterministic
-                subscribers = subs.iter().map(|s| s.clone()).collect();
+                subscribers = subs.iter().cloned().collect();
             } else {
                 panic!(); // TODO: DuplicateFulfillError
             }
@@ -349,7 +349,7 @@ impl Syscall for VatSyscall {
                 // resolvers are not transferrable
                 assert_eq!(*decider, self.vat_id);
                 // TODO: HashSet.iter is nondeterministic
-                subscribers = subs.iter().map(|s| s.clone()).collect();
+                subscribers = subs.iter().cloned().collect();
             } else {
                 panic!(); // TODO: DuplicateFulfillError
             }
@@ -380,7 +380,7 @@ impl Syscall for VatSyscall {
                 // resolvers are not transferrable
                 assert_eq!(*decider, self.vat_id);
                 // TODO: HashSet.iter is nondeterministic
-                subscribers = subs.iter().map(|s| s.clone()).collect();
+                subscribers = subs.iter().cloned().collect();
             } else {
                 panic!(); // TODO: DuplicateFulfillError
             }

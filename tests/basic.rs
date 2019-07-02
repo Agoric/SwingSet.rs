@@ -51,6 +51,10 @@ impl Dispatch for Vat1Dispatch {
         };
     }
 
+    fn deliver_promise(&mut self, _target: VatResolverID, _message: InboundVatMessage) {
+        panic!();
+    }
+
     fn notify_fulfill_to_target(&mut self, id: VatPromiseID, target: VatResolveTarget) {
         println!("Vat1.notify_fulfill_to_target {} {:?}", id, target);
     }

@@ -14,7 +14,7 @@ struct Vat1Dispatch {
     r: Option<VatResolverID>,
 }
 impl Dispatch for Vat1Dispatch {
-    fn deliver(&mut self, target: VatExportID, message: InboundVatMessage) -> () {
+    fn deliver(&mut self, target: VatExportID, message: InboundVatMessage) {
         println!("Vat1.deliver {} .{}", target, message.name);
         assert_eq!(target, VatExportID(0), "unexpected target");
 
@@ -54,8 +54,12 @@ impl Dispatch for Vat1Dispatch {
             self.syscall.reject(self.r.unwrap(), data);
             self.log.borrow_mut().push(3);
         } else {
-            panic!("unknown target {}", target);
+            panic!("unknown message {}", message.name);
         }
+    }
+
+    fn deliver_promise(&mut self, _target: VatResolverID, _message: InboundVatMessage) {
+        panic!();
     }
 
     fn notify_fulfill_to_target(&mut self, _id: VatPromiseID, _target: VatResolveTarget) {
@@ -75,7 +79,7 @@ struct Vat2Dispatch {
     p: Option<VatPromiseID>,
 }
 impl Dispatch for Vat2Dispatch {
-    fn deliver(&mut self, target: VatExportID, message: InboundVatMessage) -> () {
+    fn deliver(&mut self, target: VatExportID, message: InboundVatMessage) {
         println!("Vat2.deliver {} .{}", target, message.name);
         assert_eq!(target, VatExportID(0), "unexpected target");
 
@@ -89,8 +93,12 @@ impl Dispatch for Vat2Dispatch {
             self.syscall.subscribe(self.p.unwrap());
             self.log.borrow_mut().push(2);
         } else {
-            panic!("unknown target {}", target);
+            panic!("unknown message {}", message.name);
         }
+    }
+
+    fn deliver_promise(&mut self, _target: VatResolverID, _message: InboundVatMessage) {
+        panic!();
     }
 
     fn notify_fulfill_to_target(&mut self, id: VatPromiseID, target: VatResolveTarget) {

@@ -122,6 +122,13 @@ impl VatData {
         self.promise_clist.map_inbound(kprid)
     }
 
+    pub fn get_inbound_resolver(
+        &mut self,
+        krid: KernelPromiseResolverID,
+    ) -> VatResolverID {
+        self.resolver_clist.get_inbound(krid)
+    }
+
     pub fn map_inbound_resolver(
         &mut self,
         krid: KernelPromiseResolverID,
@@ -205,6 +212,11 @@ impl Kernel {
         to_vat: &VatName,
         to_id: u32,
     ) {
+        // TODO: even though this method is only for setting up unit tests,
+        // let's make sure this doesn't conflict with any pre-existing
+        // mapping, and let's add code to clist.allocate so some future
+        // allocation doesn't conflict with the one we add now (e.g. a loop()
+        // that keeps trying higher numbers until it finds a free one)
         let mut kd = self.kd.borrow_mut();
         let for_vat_id = *kd.vat_names.get(&for_vat).unwrap();
         let to_vat_id = *kd.vat_names.get(&to_vat).unwrap();
@@ -242,7 +254,7 @@ impl Kernel {
             } => {
                 let vat_id = target.0; // TODO nicer destructuring assignment
                 let kid = target.1;
-                println!("process: {}.{}", target, kmsg.name);
+                println!("process.Deliver: {}.{}", target, kmsg.name);
                 let veid = self.map_inbound_target(kid);
                 let vmsg = {
                     let mut kd = self.kd.borrow_mut();
@@ -268,7 +280,43 @@ impl Kernel {
                 let dispatch = self.vat_dispatch.get_mut(&vat_id).unwrap();
                 dispatch.deliver(veid, vmsg);
             }
-            //PendingDelivery::DeliverPromise(..) => {}
+
+            PendingDelivery::DeliverPromise {
+                vat_id,
+                target: target_kprid,
+                message: kmsg,
+            } => {
+                println!(
+                    "process.DeliverPromise: {} {}.{}",
+                    vat_id, target_kprid, kmsg.name
+                );
+                let (target_vrid, vmsg) = {
+                    let mut kd = self.kd.borrow_mut();
+                    let vd = kd.vat_data.get_mut(&vat_id).unwrap();
+                    let target_vrid = vd.get_inbound_resolver(target_kprid);
+                    let ovrid: Option<VatResolverID> = match kmsg.resolver {
+                        Some(krid) => Some(vd.map_inbound_resolver(krid)),
+                        None => None,
+                    };
+                    let vmsg = InboundVatMessage {
+                        name: kmsg.name,
+                        args: VatCapData {
+                            body: kmsg.args.body,
+                            slots: kmsg
+                                .args
+                                .slots
+                                .into_iter()
+                                .map(|slot| vd.map_inbound_arg_slot(slot))
+                                .collect(),
+                        },
+                        resolver: ovrid,
+                    };
+                    (target_vrid, vmsg)
+                };
+                let dispatch = self.vat_dispatch.get_mut(&vat_id).unwrap();
+                dispatch.deliver_promise(target_vrid, vmsg);
+            }
+
             PendingDelivery::NotifyFulfillToData {
                 vat_id,
                 target,
@@ -331,7 +379,6 @@ impl Kernel {
                 let dispatch = self.vat_dispatch.get_mut(&vat_id).unwrap();
                 dispatch.notify_reject(vpid, vdata);
             }
-            _ => panic!(),
         };
     }
 

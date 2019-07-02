@@ -49,6 +49,16 @@ impl<KT: CListKernelEntry, VT: CListVatEntry> CList<KT, VT> {
         }
     }
 
+    /// use this when the kernel objects being sent inbound (from the kernel,
+    /// into the vat) must already exist in the table: no allocation
+    pub fn get_inbound(&mut self, kernel_object: KT) -> VT {
+        if let Some(vat_object) = self.inbound.get(&kernel_object) {
+            *vat_object
+        } else {
+            panic!("kernel object not already in table");
+        }
+    }
+
     pub fn add(&mut self, kernel_object: KT, vat_object: VT) {
         if self.inbound.get(&kernel_object).is_some() {
             panic!("already present");

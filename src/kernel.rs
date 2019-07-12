@@ -64,8 +64,8 @@ pub(crate) enum PendingDelivery {
 pub(crate) struct VatData {
     vat_id: VatID,
     pub(crate) import_clist: CList<KernelExport, VatImportID>,
-    pub(crate) promise_clist: CList<KernelPromiseResolverID, VatPromiseID>,
-    pub(crate) resolver_clist: CList<KernelPromiseResolverID, VatResolverID>,
+    pub(crate) local_promise_clist: CList<KernelPromiseResolverID, VatPromiseID>,
+    pub(crate) remote_promise_clist: CList<KernelPromiseResolverID, VatResolverID>,
 }
 impl VatData {
     // it's totally legit for vat A to hold a promise, vat B resolves
@@ -171,8 +171,9 @@ pub(crate) struct KernelData {
     pub(crate) vat_names: HashMap<VatName, VatID>,
     pub(crate) vat_data: HashMap<VatID, VatData>,
     pub(crate) run_queue: RunQueue,
-    pub(crate) next_promise_resolver_id: u32,
-    pub(crate) promises: HashMap<KernelPromiseResolverID, KernelPromise>,
+    pub(crate) next_promise_id: usize,
+    pub(crate) presences: PresenceTable,
+    pub(crate) promises: HashMap<KernelPromiseID, KernelPromise>,
 }
 
 //#[derive(Debug)]

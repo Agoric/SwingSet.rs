@@ -1,11 +1,25 @@
 use core::hash::Hash;
 use std::collections::HashMap;
 
+// The c-lists hold mappings between kernel identifiers and vat identifiers.
+// Depending upon the identifier type and the API in which it appears, the
+// mapping might be "allocate if necessary" "must already be present", or
+// "tag with VatID".
+
+// Kernel-side Presences are tagged with the VatID which owns the Presence
+// (i.e. where messages will be delivered and consumed). Kernel-side Promises
+// are tagged with the VatID which can decide its resolution (which is also
+// where messages will be delivered, although they may be forwarded elsewhere
+// before they are finally consumed).
+
+
 pub(crate) trait CListVatEntry: Eq + Hash + Copy {
     fn new(index: u32) -> Self;
 }
 
-pub(crate) trait CListKernelEntry: Eq + Hash + Copy {}
+pub(crate) trait CListKernelEntry: Eq + Hash + Copy {
+    fn new(index: u32) -> Self;
+}
 
 #[derive(Debug, Default)]
 pub(crate) struct CList<KT: CListKernelEntry, VT: CListVatEntry> {

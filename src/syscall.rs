@@ -56,55 +56,54 @@ pub struct CapData {
     pub slots: Vec<CapSlot>,
 }
 
-pub struct OutboundMessage {
-    pub name: String,
-    pub args: CapData,
-    pub result: Option<SendResult>,
+pub enum Result {
+    SendResult(SendResult),
+    DispatchResult(DispatchResult),
 }
 
-enum OutboundTarget {
+pub struct Message {
+    pub method: String,
+    pub args: CapData,
+    pub result: Option<Result>,
+}
+
+pub enum OutboundTarget {
     SendResult(SendResult),
     RemotePromise(RemotePromise),
     Import(Import),
 }
 
-enum RemotelyResolvable {
+pub enum RemotelyResolvable {
     SendResult(SendResult),
     RemotePromise(RemotePromise),
 }
 
-enum LocallyResolvable {
+pub enum LocallyResolvable {
     LocalPromise(LocalPromise),
     DispatchResult(DispatchResult),
 }
 
-enum Resolution {
+pub enum Resolution {
     Reference(CapSlot),
     Data(CapData),
     Rejection(CapData),
 }
 
 pub trait Syscall {
-    fn send(&mut self, target: OutboundTarget, msg: OutboundMessage);
-    //fn invoke(&mut self, target: OutboundDeviceNode, msg: OutboundDeviceMessage) -> CapData;
+    fn send(&mut self, target: OutboundTarget, msg: Message);
+    //fn invoke(&mut self, target: OutboundDeviceNode, msg: DeviceMessage) -> CapData;
     fn subscribe(&mut self, id: RemotelyResolvable);
     fn resolve(&mut self, id: LocallyResolvable, to: Resolution);
 }
 
-enum InboundTarget {
+pub enum InboundTarget {
     LocalPromise(LocalPromise),
     Export(Export),
     DispatchResult(DispatchResult),
 }
 
-pub struct InboundMessage {
-    pub name: String,
-    pub args: CapData,
-    pub result: Option<DispatchResult>,
-}
-
 pub trait Dispatch {
-    fn deliver(&mut self, target: InboundTarget, msg: InboundMessage);
+    fn deliver(&mut self, target: InboundTarget, msg: Message);
     fn subscribe(&mut self, id: LocallyResolvable);
     fn notify_resolved(&mut self, id: RemotelyResolvable, to: Resolution);
 }

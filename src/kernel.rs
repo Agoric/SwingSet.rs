@@ -33,11 +33,32 @@ impl CListVatEntry for VatResolverID {
 impl CListKernelEntry for KernelExport {}
 impl CListKernelEntry for KernelPromiseResolverID {}
 
+
+#[derive(Debug, Eq, PartialEq, Hash, Copy, Clone)]
+pub enum CapSlot {
+    Promise(PromiseID),
+    Export(ExportID),
+}
+
+// the kernel-side CapData references kernel slots
+#[derive(Debug, Clone)]
+pub struct CapData {
+    pub body: Vec<u8>,
+    pub slots: Vec<CapSlot>,
+}
+
+pub struct Message {
+    pub method: String,
+    pub args: CapData,
+    pub result: Option<PromiseID>,
+}
+
+
 #[derive(Debug)]
 pub(crate) enum PendingDelivery {
     Deliver {
         target: KernelExport,
-        message: KernelMessage,
+        message: Message,
     },
     DeliverPromise {
         vat_id: VatID,

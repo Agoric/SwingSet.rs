@@ -5,14 +5,19 @@ use std::collections::HashSet;
 pub(crate) struct PromiseID(pub usize);
 
 //#[derive(Debug, Eq, PartialEq, Hash, Copy, Clone)]
-pub(crate) enum Promise {
+pub(crate) enum PromiseState {
     Unresolved {
         subscribers: HashSet<VatID>,
-        decider: VatID,
     },
     FulfilledToTarget(KernelExport),
     FulfilledToData(KernelCapData),
     Rejected(KernelCapData),
+}
+
+pub(crate) struct Promise {
+    pub(crate) decider: VatID,
+    pub(crate) allocator: VatID,
+    pub(crate) state: PromiseState,
 }
 
 pub(crate) struct PromiseTable {

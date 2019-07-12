@@ -4,10 +4,15 @@ use std::fmt;
 pub struct VatName(pub String);
 
 #[derive(PartialEq, Eq, Debug, Hash, Copy, Clone)]
-pub struct VatID(pub u32);
+pub struct VatID(pub usize);
 
 #[derive(Debug, Eq, PartialEq, Hash, Copy, Clone)]
-pub struct KernelExportID(pub u32);
+pub struct ExportID(pub usize);
+
+#[derive(Debug, Eq, PartialEq, Hash, Copy, Clone)]
+pub(crate) struct Export {
+    pub(crate) owner: VatID,
+}
 
 // within the kernel, promises and resolvers always appear in pairs
 #[derive(Debug, Eq, PartialEq, Hash, Copy, Clone)]

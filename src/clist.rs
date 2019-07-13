@@ -3,29 +3,22 @@ use std::collections::HashMap;
 
 // The c-lists hold mappings between kernel identifiers and vat identifiers.
 // Depending upon the identifier type and the API in which it appears, the
-// mapping might be "allocate if necessary" "must already be present", or
-// "tag with VatID".
-
-// Kernel-side Presences are tagged with the VatID which owns the Presence
-// (i.e. where messages will be delivered and consumed). Kernel-side Promises
-// are tagged with the VatID which can decide its resolution (which is also
-// where messages will be delivered, although they may be forwarded elsewhere
-// before they are finally consumed).
-
+// mapping might be "allocate if necessary", "must already be present", or
+// "must not be present".
 
 pub(crate) trait CListVatEntry: Eq + Hash + Copy {
-    fn new(index: u32) -> Self;
+    fn new(index: usize) -> Self;
 }
 
 pub(crate) trait CListKernelEntry: Eq + Hash + Copy {
-    fn new(index: u32) -> Self;
+    fn new(index: usize) -> Self;
 }
 
 #[derive(Debug, Default)]
 pub(crate) struct CList<KT: CListKernelEntry, VT: CListVatEntry> {
     pub(crate) inbound: HashMap<KT, VT>,
     pub(crate) outbound: HashMap<VT, KT>,
-    next_index: u32,
+    next_vat_index: usize,
 }
 impl<KT: CListKernelEntry, VT: CListVatEntry> CList<KT, VT> {
     /*pub fn _map_outbound<T: Into<VatArgSlot>>(&self, target: T) -> KernelArgSlot {
@@ -37,29 +30,33 @@ impl<KT: CListKernelEntry, VT: CListVatEntry> CList<KT, VT> {
         CList {
             inbound: HashMap::new(),
             outbound: HashMap::new(),
-            next_index: 0,
+            next_vat_index: 0,
         }
     }
 
-    /// vat objects being sent outbound (out of the vat and into the kernel)
-    /// must already exist in the clist: this is how we confine vats to only
-    /// use previously-granted authorities
-    pub fn map_outbound(&self, vat_object: VT) -> KT {
-        *self.outbound.get(&vat_object).unwrap()
+    /// use this when the vat object being sent outbound (into the kernel)
+    /// must already exist in the table: no allocation
+    pub fn get_outbound(&mut self, vat_object: VT) -> KT {
+        if let Some(kernel_object) = self.outbound.get(&vat_object) {
+            *kernel_object
+        } else {
+            panic!("vat object not already in table");
+        }
     }
 
-    /// kernel objects being sent inbound (from the kernel, into the vat)
-    /// might already exist, or they might need to allocate new vat-side
-    /// identifiers
-    pub fn map_inbound(&mut self, kernel_object: KT) -> VT {
-        if let Some(vat_object) = self.inbound.get(&kernel_object) {
-            *vat_object
+    /// Vat objects like Exports will allocate a kernel object the first time
+    /// they are sent outbound, and will re-use that same kernel object next
+    /// time. If allocation is necessary, it requires access to a central
+    /// table (outside this one Vat's c-list), so we must be given an
+    /// allocation closure just in case.
+    pub fn map_outbound(&self, vat_object: VT, allocate: FnOnce() -> KT) -> KT {
+        if let Some(kernel_object) = self.outbound.get(&vat_object) {
+            *kernel_object
         } else {
-            let vat_object = VT::new(self.next_index);
-            self.next_index += 1;
+            let kernel_object = allocate();
             self.inbound.insert(kernel_object, vat_object);
             self.outbound.insert(vat_object, kernel_object);
-            vat_object
+            kernel_object
         }
     }
 
@@ -73,13 +70,31 @@ impl<KT: CListKernelEntry, VT: CListVatEntry> CList<KT, VT> {
         }
     }
 
-    /// use this when the vat object being sent outbound (into the kernel)
-    /// must already exist in the table: no allocation
-    pub fn get_outbound(&mut self, vat_object: VT) -> KT {
-        if let Some(kernel_object) = self.outbound.get(&vat_object) {
-            *kernel_object
+    /*
+    /// use this when the kernel objects being sent inbound (from the kernel,
+    /// into the vat) might exist in the table, but if not we'll look in some
+    /// other table
+    pub fn maybe_get_inbound(&mut self, kernel_object: KT) -> Option<VT> {
+        if let Some(vat_object) = self.inbound.get(&kernel_object) {
+            *vat_object
         } else {
-            panic!("vat object not already in table");
+            None
+        }
+    }*/
+
+    /// kernel objects being sent inbound (from the kernel, into the vat)
+    /// might already exist, or they might need to allocate new vat-side
+    /// identifiers. The vat-side identifier is just a number, so we can
+    /// allocate it here without an external closure.
+    pub fn map_inbound(&mut self, kernel_object: KT) -> VT {
+        if let Some(vat_object) = self.inbound.get(&kernel_object) {
+            *vat_object
+        } else {
+            let vat_object = VT::new(self.next_vat_index);
+            self.next_vat_index += 1;
+            self.inbound.insert(kernel_object, vat_object);
+            self.outbound.insert(vat_object, kernel_object);
+            vat_object
         }
     }
 
@@ -100,12 +115,12 @@ mod test {
     use super::*;
 
     #[derive(Debug, Eq, PartialEq, Hash, Clone, Copy)]
-    struct KType(u32);
+    struct KType(usize);
     impl CListKernelEntry for KType {}
     #[derive(Debug, Eq, PartialEq, Hash, Clone, Copy)]
-    struct VType(u32);
+    struct VType(usize);
     impl CListVatEntry for VType {
-        fn new(index: u32) -> Self {
+        fn new(index: usize) -> Self {
             VType(index)
         }
     }

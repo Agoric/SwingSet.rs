@@ -1,17 +1,16 @@
-use super::kernel_types::{KernelCapData, KernelExport, VatID};
-use std::collections::HashSet;
+use super::kernel_types::{CapData, VatID};
+use super::presence::PresenceID;
+use std::collections::{HashMap, HashSet};
 
 #[derive(Debug, Eq, PartialEq, Hash, Copy, Clone)]
 pub(crate) struct PromiseID(pub usize);
 
 //#[derive(Debug, Eq, PartialEq, Hash, Copy, Clone)]
 pub(crate) enum PromiseState {
-    Unresolved {
-        subscribers: HashSet<VatID>,
-    },
-    FulfilledToTarget(KernelExport),
-    FulfilledToData(KernelCapData),
-    Rejected(KernelCapData),
+    Unresolved { subscribers: HashSet<VatID> },
+    FulfilledToTarget(PresenceID),
+    FulfilledToData(CapData),
+    Rejected(CapData),
 }
 
 pub(crate) struct Promise {
@@ -26,10 +25,24 @@ pub(crate) struct PromiseTable {
 }
 
 impl PromiseTable {
-    pub fn allocate_unresolved(&mut self, decider: VatID, id: ???PromiseID) -> PromiseID {
-        let id = PromiseID(self.next_presence_id);
-        self.next_presence_id += 1;
-        self.presences.insert(id, Promise { owner, id });
+    pub fn allocate_unresolved(&mut self, decider: VatID, allocator: VatID) -> PromiseID {
+        let id = PromiseID(self.next_promise_id);
+        self.next_promise_id += 1;
+        let state = PromiseState::Unresolved {
+            subscribers: vec![],
+        };
+        self.promises.insert(
+            id,
+            Promise {
+                decider,
+                allocator,
+                state,
+            },
+        );
         id
+    }
+
+    pub fn decider_of(&mut self, id: PromiseID) {
+        self.promises.get(&id).decider
     }
 }

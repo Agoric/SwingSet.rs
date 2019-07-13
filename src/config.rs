@@ -1,6 +1,5 @@
-use super::dispatch::Dispatch;
 use super::kernel_types::VatName;
-use super::syscall::Syscall;
+use super::syscall::{Dispatch, Syscall};
 use std::collections::HashMap;
 
 /*#[derive(PartialEq, Eq, Debug, Hash)]

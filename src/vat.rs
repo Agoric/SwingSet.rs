@@ -1,18 +1,11 @@
-use super::kernel::{KernelData, PendingDelivery};
-use super::kernel_types::{
-    KernelArgSlot, KernelCapData, KernelExport, KernelExportID, KernelMessage,
-    KernelPromiseResolverID, KernelTarget, VatID,
-};
-use super::promise::KernelPromise;
-use super::syscall::Syscall;
-use super::vat_types::{
-    OutboundVatMessage, VatArgSlot, VatCapData, VatPromiseID, VatResolveTarget,
-    VatResolverID, VatSendTarget,
-};
+use super::kernel::KernelData;
+use super::kernel_types::VatID;
+use super::syscall::{CapSlot, Message, Promise, Resolution, Syscall};
 use std::cell::RefCell;
-use std::collections::HashSet;
+//use std::collections::HashSet;
 use std::rc::Rc;
 
+/*
 enum TargetCategory {
     Export(KernelExport),                    // queue message to an Export
     Promise(VatID, KernelPromiseResolverID), // queue message to exported promise (pipelining)
@@ -20,6 +13,7 @@ enum TargetCategory {
     // TODO might be helpful to summarize the data
     Rejected(KernelCapData), // error: rejected-promise contagion
 }
+*/
 
 pub(crate) struct VatSyscall {
     vat_id: VatID,
@@ -31,6 +25,7 @@ impl VatSyscall {
         VatSyscall { vat_id, kd }
     }
 
+    /*
     fn map_outbound_target(&self, vtarget: VatSendTarget) -> KernelTarget {
         let kd = self.kd.borrow_mut();
         let vd = kd.vat_data.get(&self.vat_id).unwrap();
@@ -255,31 +250,16 @@ impl VatSyscall {
         let mut kd = self.kd.borrow_mut();
         kd.run_queue.0.push_back(notification);
     }
+     */
 }
 
 impl Syscall for VatSyscall {
-    fn send(&mut self, vtarget: VatSendTarget, vmsg: OutboundVatMessage) -> VatPromiseID {
-        let ovpid = self.do_send(vtarget, vmsg, false);
-        ovpid.unwrap()
+    fn send(&mut self, target: CapSlot, msg: Message) {
+        //self.do_send(target, msg);
     }
 
-    fn send_only(&mut self, vtarget: VatSendTarget, vmsg: OutboundVatMessage) {
-        self.do_send(vtarget, vmsg, true);
-    }
-
-    fn allocate_promise_and_resolver(&mut self) -> (VatPromiseID, VatResolverID) {
-        let p = KernelPromise::Unresolved {
-            subscribers: HashSet::new(),
-            decider: self.vat_id,
-        };
-        let (vpid, kprid) = self.allocate_promise(p);
-        let mut kd = self.kd.borrow_mut();
-        let vd = kd.vat_data.get_mut(&self.vat_id).unwrap();
-        let vrid = vd.resolver_clist.map_inbound(kprid);
-        (vpid, vrid)
-    }
-
-    fn subscribe(&mut self, vpid: VatPromiseID) {
+    fn subscribe(&mut self, id: Promise) {
+        /*
         let mut kd = self.kd.borrow_mut();
         let vd = kd.vat_data.get_mut(&self.vat_id).unwrap();
         let kprid = vd.promise_clist.map_outbound(vpid);
@@ -311,8 +291,14 @@ impl Syscall for VatSyscall {
             },
         };
         kd.run_queue.0.push_back(pd);
+        */
     }
 
+    fn resolve(&mut self, id: Promise, to: Resolution) {
+        self.do_resolve(id, to);
+    }
+
+    /*
     fn fulfill_to_target(&mut self, resolver: VatResolverID, vtarget: VatResolveTarget) {
         use KernelPromise::{FulfilledToTarget, Unresolved};
 
@@ -488,4 +474,5 @@ impl Syscall for VatSyscall {
             kd.run_queue.0.push_back(pd);
         }
     }
+    */
 }

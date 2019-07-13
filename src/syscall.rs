@@ -1,7 +1,7 @@
 /// This defines the dispatch/syscall API (the two function groups at the
 /// boundary between Vat and Kernel), and the types used in them.
 ///
-/// There are six kinds of references that make an appearance in the
+/// There are four kinds of references that make an appearance in the
 /// dispatch/syscall API: the cross-product of two properties (all from the
 /// perspective of the Vat holding/sending/receiving the reference):
 ///
@@ -9,43 +9,34 @@
 ///   1: I allocate the ID
 ///   2: Somebody else allocates it
 /// resolution:
-///   1: I can resolve it
-///   2: Somebody else resolves it
-///   3: It is already resolved
+///   1: It is already resolved
+///   2: It is not yet resolved
 ///
-/// We give these six names:
+/// We give these four names:
 ///
-/// Local Promise: I allocate the ID, I can resolve it.
-/// Send Result: I allocate the ID, somebody else resolves it
+/// Local Promise: I allocate the ID, someone (maybe me) can resolve it.
 /// Export: I allocate the ID, it is already resolved
-/// Dispatch Result: Somebody else allocated the ID, but I can resolve it
-/// RemotePromise: Somebody else allocated the ID, and they will resolve it
+/// RemotePromise: Somebody else allocated the ID, someone (maybe me) will resolve it
 /// Import: Somebody else allocated the ID, and it is already resolved
 
 // TODO: we need a name for the pass-by-presence type. "target"? "export"?
 
 #[derive(Debug, Eq, PartialEq, Hash, Copy, Clone)]
-pub struct LocalPromise(pub usize);
+pub struct LocalPromiseID(pub usize);
 #[derive(Debug, Eq, PartialEq, Hash, Copy, Clone)]
-pub struct SendResult(pub usize);
-#[derive(Debug, Eq, PartialEq, Hash, Copy, Clone)]
-pub struct Export(pub usize);
+pub struct ExportID(pub usize);
 
 #[derive(Debug, Eq, PartialEq, Hash, Copy, Clone)]
-pub struct DispatchResult(pub usize);
+pub struct RemotePromiseID(pub usize);
 #[derive(Debug, Eq, PartialEq, Hash, Copy, Clone)]
-pub struct RemotePromise(pub usize);
-#[derive(Debug, Eq, PartialEq, Hash, Copy, Clone)]
-pub struct Import(pub usize);
+pub struct ImportID(pub usize);
 
 #[derive(Debug, Eq, PartialEq, Hash, Copy, Clone)]
 pub enum CapSlot {
-    LocalPromise(LocalPromise),
-    SendResult(SendResult),
-    Export(Export),
-    DispatchResult(DispatchResult),
-    RemotePromise(RemotePromise),
-    Import(Import),
+    LocalPromise(LocalPromiseID),
+    Export(ExportID),
+    RemotePromise(RemotePromiseID),
+    Import(ImportID),
 }
 
 /// CapData is capability-bearing data, used for the message arguments and
@@ -56,31 +47,15 @@ pub struct CapData {
     pub slots: Vec<CapSlot>,
 }
 
-pub enum Result {
-    SendResult(SendResult),
-    DispatchResult(DispatchResult),
+pub enum Promise {
+    LocalPromise(LocalPromiseID),
+    RemotePromise(RemotePromiseID),
 }
 
 pub struct Message {
     pub method: String,
     pub args: CapData,
-    pub result: Option<Result>,
-}
-
-pub enum OutboundTarget {
-    SendResult(SendResult),
-    RemotePromise(RemotePromise),
-    Import(Import),
-}
-
-pub enum RemotelyResolvable {
-    SendResult(SendResult),
-    RemotePromise(RemotePromise),
-}
-
-pub enum LocallyResolvable {
-    LocalPromise(LocalPromise),
-    DispatchResult(DispatchResult),
+    pub result: Option<Promise>,
 }
 
 pub enum Resolution {
@@ -90,20 +65,20 @@ pub enum Resolution {
 }
 
 pub trait Syscall {
-    fn send(&mut self, target: OutboundTarget, msg: Message);
+    fn send(&mut self, target: CapSlot, msg: Message);
     //fn invoke(&mut self, target: OutboundDeviceNode, msg: DeviceMessage) -> CapData;
-    fn subscribe(&mut self, id: RemotelyResolvable);
-    fn resolve(&mut self, id: LocallyResolvable, to: Resolution);
+    fn subscribe(&mut self, id: Promise);
+    fn resolve(&mut self, id: Promise, to: Resolution);
 }
 
 pub enum InboundTarget {
-    LocalPromise(LocalPromise),
-    Export(Export),
-    DispatchResult(DispatchResult),
+    LocalPromise(LocalPromiseID),
+    RemotePromise(RemotePromiseID),
+    Export(ExportID),
 }
 
 pub trait Dispatch {
     fn deliver(&mut self, target: InboundTarget, msg: Message);
-    fn subscribe(&mut self, id: LocallyResolvable);
-    fn notify_resolved(&mut self, id: RemotelyResolvable, to: Resolution);
+    fn subscribe(&mut self, id: Promise);
+    fn notify_resolved(&mut self, id: Promise, to: Resolution);
 }

@@ -1,7 +1,7 @@
 //use std::fmt::Debug;
 use super::config::Config;
 use super::kernel::Kernel;
-use super::kernel_types::{KernelCapData, KernelExportID, KernelMessage, VatName};
+use super::kernel_types::VatName;
 
 //#[derive(Debug)]
 pub struct Controller {
@@ -25,6 +25,7 @@ impl Controller {
     }
 
     pub fn start(&mut self) {
+        /*
         self.kernel.push(
             &VatName("bootstrap".to_string()),
             KernelExportID(0),
@@ -37,9 +38,11 @@ impl Controller {
                 resolver: None,
             },
         );
+         */
     }
 
     pub fn push(&mut self, vat_name: &str, target: u32, method: &str, args_body: &[u8]) {
+        /*
         self.kernel.push(
             &VatName(vat_name.to_string()),
             KernelExportID(target),
@@ -51,7 +54,7 @@ impl Controller {
                 },
                 resolver: None,
             },
-        );
+        );*/
     }
 
     pub fn step(&mut self) {

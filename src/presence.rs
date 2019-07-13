@@ -15,6 +15,13 @@ pub(crate) struct PresenceTable {
 }
 
 impl PresenceTable {
+    pub fn default() -> PresenceTable {
+        PresenceTable {
+            presences: HashMap::default(),
+            next_presence_id: 0,
+        }
+    }
+
     pub fn allocate(&mut self, owner: VatID) -> PresenceID {
         let id = PresenceID(self.next_presence_id);
         self.next_presence_id += 1;
@@ -23,7 +30,8 @@ impl PresenceTable {
         id
     }
 
-    pub fn owner_of(&mut self, id: PresenceID) {
-        *self.presences.get(&id)
+    #[allow(dead_code)]
+    pub fn owner_of(&mut self, id: PresenceID) -> VatID {
+        self.presences.get(&id).unwrap().owner
     }
 }

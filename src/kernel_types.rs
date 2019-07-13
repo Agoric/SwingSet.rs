@@ -10,7 +10,9 @@ pub(crate) struct VatID(pub usize);
 
 #[derive(Debug, Eq, PartialEq, Hash, Copy, Clone)]
 pub(crate) enum CapSlot {
+    #[allow(dead_code)]
     Presence(PresenceID),
+    #[allow(dead_code)]
     Promise(PromiseID),
 }
 
@@ -24,23 +26,29 @@ pub(crate) struct CapData {
 
 #[derive(Debug)]
 pub(crate) struct Message {
-    pub(crate) name: String,
+    pub(crate) method: String,
     pub(crate) args: CapData,
     pub(crate) result: Option<PromiseID>,
 }
 
-pub enum Resolution {
+#[derive(Debug)]
+pub(crate) enum Resolution {
+    #[allow(dead_code)]
     Reference(CapSlot),
+    #[allow(dead_code)]
     Data(CapData),
+    #[allow(dead_code)]
     Rejection(CapData),
 }
 
 #[derive(Debug)]
 pub(crate) enum PendingDelivery {
+    #[allow(dead_code)]
     Deliver {
         target: CapSlot,
         message: Message,
     },
+    #[allow(dead_code)]
     Notify {
         vat_id: VatID,
         promise: PromiseID,

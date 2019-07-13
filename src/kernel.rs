@@ -62,16 +62,18 @@ impl Kernel {
         Kernel { vat_dispatch, kd }
     }
 
-    pub fn vat_id_of_target(&mut self, target: CapSlot) -> VatID {
+    /*
+    fn vat_id_of_target(&mut self, target: CapSlot) -> VatID {
+        let mut kd = self.kd.borrow_mut();
         match target {
-            CapSlot::Presence(id) => self.presences.owner_of(id),
-            CapSlot::Promise(id) => self.promises.decider_of(id),
+            CapSlot::Presence(id) => kd.presences.owner_of(id),
+            CapSlot::Promise(id) => kd.promises.decider_of(id),
         }
-    }
+    }*/
 
     fn map_inbound_promise(&mut self, to: VatID, id: PromiseID) -> VatPromise {
         let mut kd = self.kd.borrow_mut();
-        let allocator = *kd.promises.get(id).allocator;
+        let allocator = kd.promises.promises.get(&id).unwrap().allocator;
         let vd = kd.vat_data.get_mut(&allocator).unwrap();
         if to == allocator {
             VatPromise::LocalPromise(vd.local_promise_clist.map_inbound(id))
@@ -84,7 +86,7 @@ impl Kernel {
         match slot {
             CapSlot::Presence(id) => {
                 let mut kd = self.kd.borrow_mut();
-                let owner = *kd.presences.get(id).owner;
+                let owner = kd.presences.presences.get(&id).unwrap().owner;
                 let vd = kd.vat_data.get_mut(&owner).unwrap();
                 if to == owner {
                     VatCapSlot::Export(vd.export_clist.get_inbound(id))
@@ -92,7 +94,7 @@ impl Kernel {
                     VatCapSlot::Import(vd.import_clist.map_inbound(id))
                 }
             }
-            CapSlot::Promise(id) => match self.map_inbound_promise(id) {
+            CapSlot::Promise(id) => match self.map_inbound_promise(to, id) {
                 VatPromise::LocalPromise(pid) => VatCapSlot::LocalPromise(pid),
                 VatPromise::RemotePromise(pid) => VatCapSlot::RemotePromise(pid),
             },
@@ -134,8 +136,8 @@ impl Kernel {
             None => None,
             Some(id) => {
                 let decider = {
-                    let mut kd = self.kd.borrow_mut();
-                    *kd.promises.get(id).decider
+                    let kd = self.kd.borrow_mut();
+                    kd.promises.promises.get(&id).unwrap().decider
                 };
                 if decider != to {
                     panic!("result {} is not being decided by recipient {}", id, to);
@@ -147,15 +149,16 @@ impl Kernel {
 
     fn map_inbound_message(&mut self, to: VatID, kmsg: Message) -> VatMessage {
         VatMessage {
-            name: kmsg.name,
+            method: kmsg.method,
             args: self.map_inbound_capdata(to, kmsg.args),
             result: self.map_inbound_result(to, kmsg.result),
         }
     }
 
+    /*
     fn map_outbound_promise(&mut self, to: VatID, id: PromiseID) -> VatPromise {
         let mut kd = self.kd.borrow_mut();
-        let allocator = *kd.promises.get(id).allocator;
+        let allocator = kd.promises.promises.get(&id).unwrap().allocator;
         let vd = kd.vat_data.get_mut(&allocator).unwrap();
         if to == allocator {
             VatPromise::LocalPromise(vd.local_promise_clist.map_inbound(id))
@@ -163,8 +166,9 @@ impl Kernel {
             VatPromise::RemotePromise(vd.remote_promise_clist.map_inbound(id))
         }
     }
+    */
 
-    pub fn map_outbound_target(&mut self, vtarget: VatCapSlot) -> CapSlot {}
+    //pub fn map_outbound_target(&mut self, vtarget: VatCapSlot) -> CapSlot {}
 
     /*
     pub fn _add_vat(&mut self, name: &VatName, dispatch: impl Dispatch + 'static) {
@@ -190,10 +194,23 @@ impl Kernel {
         let mut kd = self.kd.borrow_mut();
         let for_vat_id = *kd.vat_names.get(&for_vat).unwrap();
         let to_vat_id = *kd.vat_names.get(&to_vat).unwrap();
-        let pid = {
+        let ve = ExportID(to_id);
+        /*
+        vd.export_clist
+        .map_outbound(ExportID(to_id), &|| kd.presences.allocate(to_vat_id))
+         */
+        let opid = {
             let vd = kd.vat_data.get_mut(&to_vat_id).unwrap();
-            vd.export_clist
-                .map_outbound(ExportID(to_id), || self.presences.allocate(to_vat_id))
+            vd.export_clist.maybe_get_outbound(ve)
+        };
+        let pid = match opid {
+            Some(pid) => pid,
+            None => {
+                let pid = kd.presences.allocate(to_vat_id);
+                let vd = kd.vat_data.get_mut(&to_vat_id).unwrap();
+                vd.export_clist.add(pid, ve);
+                pid
+            }
         };
         let vd = kd.vat_data.get_mut(&for_vat_id).unwrap();
         vd.import_clist.add(pid, ImportID(for_id));
@@ -219,17 +236,17 @@ impl Kernel {
     fn process(&mut self, pd: PendingDelivery) {
         match pd {
             PendingDelivery::Deliver { target, message } => {
-                println!("process.Deliver: {}.{}", target, message.name);
+                println!("process.Deliver: {}.{}", target, message.method);
                 let (vat_id, vtarget) = match target {
                     CapSlot::Presence(id) => {
-                        let owner = self.kd.borrow().presences.get(id).owner;
+                        let owner = self.kd.borrow().presences.presences.get(&id).unwrap().owner;
                         let mut kd = self.kd.borrow_mut();
                         let vd = kd.vat_data.get_mut(&owner).unwrap();
                         let vid = vd.export_clist.get_inbound(id);
                         (owner, InboundTarget::Export(vid))
                     }
                     CapSlot::Promise(id) => {
-                        let decider = self.kd.borrow().promises.get(id).decider;
+                        let decider = self.kd.borrow().promises.promises.get(&id).unwrap().decider;
                         let p = self.map_inbound_promise(decider, id);
                         (
                             decider,
@@ -246,7 +263,7 @@ impl Kernel {
                         )
                     }
                 };
-                let vmessage = self.map_inbound_message(message);
+                let vmessage = self.map_inbound_message(vat_id, message);
                 let dispatch = self.vat_dispatch.get_mut(&vat_id).unwrap();
                 dispatch.deliver(vtarget, vmessage);
             }
@@ -257,10 +274,10 @@ impl Kernel {
                 resolution,
             } => {
                 println!("Process.Notify");
-                let vpromise = self.map_inbound_promise(promise);
-                let vresolution = self.map_inbound_resolution(resolution);
+                let vpromise = self.map_inbound_promise(vat_id, promise);
+                let vresolution = self.map_inbound_resolution(vat_id, resolution);
                 let dispatch = self.vat_dispatch.get_mut(&vat_id).unwrap();
-                dispatch.notify(vpromise, vresolution);
+                dispatch.notify_resolved(vpromise, vresolution);
             }
         };
     }

@@ -16,7 +16,9 @@ enum TargetCategory {
 */
 
 pub(crate) struct VatSyscall {
+    #[allow(dead_code)]
     vat_id: VatID,
+    #[allow(dead_code)]
     kd: Rc<RefCell<KernelData>>,
 }
 
@@ -254,11 +256,11 @@ impl VatSyscall {
 }
 
 impl Syscall for VatSyscall {
-    fn send(&mut self, target: CapSlot, msg: Message) {
+    fn send(&mut self, _target: CapSlot, _msg: Message) {
         //self.do_send(target, msg);
     }
 
-    fn subscribe(&mut self, id: Promise) {
+    fn subscribe(&mut self, _id: Promise) {
         /*
         let mut kd = self.kd.borrow_mut();
         let vd = kd.vat_data.get_mut(&self.vat_id).unwrap();
@@ -294,8 +296,8 @@ impl Syscall for VatSyscall {
         */
     }
 
-    fn resolve(&mut self, id: Promise, to: Resolution) {
-        self.do_resolve(id, to);
+    fn resolve(&mut self, _id: Promise, _to: Resolution) {
+        /*self.do_resolve(id, to);*/
     }
 
     /*

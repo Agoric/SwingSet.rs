@@ -44,7 +44,8 @@ impl CListKernelEntry for PromiseID {
 }
 
 pub(crate) struct VatData {
-    vat_id: VatID,
+    #[allow(dead_code)]
+    pub(crate) vat_id: VatID,
     pub(crate) import_clist: CList<PresenceID, ImportID>,
     pub(crate) export_clist: CList<PresenceID, ExportID>,
     pub(crate) local_promise_clist: CList<PromiseID, LocalPromiseID>,

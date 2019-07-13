@@ -17,9 +17,9 @@ impl Controller {
     pub fn add_import(
         &mut self,
         for_vat: &VatName,
-        for_id: u32,
+        for_id: usize,
         to_vat: &VatName,
-        to_id: u32,
+        to_id: usize,
     ) {
         self.kernel.add_import(for_vat, for_id, to_vat, to_id);
     }
@@ -41,7 +41,7 @@ impl Controller {
          */
     }
 
-    pub fn push(&mut self, vat_name: &str, target: u32, method: &str, args_body: &[u8]) {
+    pub fn push(&mut self, _vat_name: &str, _target: usize, _method: &str, _args_body: &[u8]) {
         /*
         self.kernel.push(
             &VatName(vat_name.to_string()),

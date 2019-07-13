@@ -36,6 +36,7 @@ impl<KT: CListKernelEntry, VT: CListVatEntry> CList<KT, VT> {
 
     /// use this when the vat object being sent outbound (into the kernel)
     /// must already exist in the table: no allocation
+    #[allow(dead_code)]
     pub fn get_outbound(&mut self, vat_object: VT) -> KT {
         if let Some(kernel_object) = self.outbound.get(&vat_object) {
             *kernel_object
@@ -44,12 +45,15 @@ impl<KT: CListKernelEntry, VT: CListVatEntry> CList<KT, VT> {
         }
     }
 
+    // I want to use this allocation thing, but I don't know how to make the
+    // borrowing work
+    /*
     /// Vat objects like Exports will allocate a kernel object the first time
     /// they are sent outbound, and will re-use that same kernel object next
     /// time. If allocation is necessary, it requires access to a central
     /// table (outside this one Vat's c-list), so we must be given an
     /// allocation closure just in case.
-    pub fn map_outbound(&self, vat_object: VT, allocate: FnOnce() -> KT) -> KT {
+    pub fn map_outbound(&mut self, vat_object: VT, allocate: &FnOnce() -> KT) -> KT {
         if let Some(kernel_object) = self.outbound.get(&vat_object) {
             *kernel_object
         } else {
@@ -57,6 +61,14 @@ impl<KT: CListKernelEntry, VT: CListVatEntry> CList<KT, VT> {
             self.inbound.insert(kernel_object, vat_object);
             self.outbound.insert(vat_object, kernel_object);
             kernel_object
+        }
+    }
+     */
+
+    pub fn maybe_get_outbound(&mut self, vat_object: VT) -> Option<KT> {
+        match self.outbound.get(&vat_object) {
+            Some(&ko) => Some(ko),
+            None => None,
         }
     }
 

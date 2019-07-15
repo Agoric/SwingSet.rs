@@ -239,14 +239,16 @@ impl Kernel {
                 println!("process.Deliver: {}.{}", target, message.method);
                 let (vat_id, vtarget) = match target {
                     CapSlot::Presence(id) => {
-                        let owner = self.kd.borrow().presences.presences.get(&id).unwrap().owner;
+                        let owner =
+                            self.kd.borrow().presences.presences.get(&id).unwrap().owner;
                         let mut kd = self.kd.borrow_mut();
                         let vd = kd.vat_data.get_mut(&owner).unwrap();
                         let vid = vd.export_clist.get_inbound(id);
                         (owner, InboundTarget::Export(vid))
                     }
                     CapSlot::Promise(id) => {
-                        let decider = self.kd.borrow().promises.promises.get(&id).unwrap().decider;
+                        let decider =
+                            self.kd.borrow().promises.promises.get(&id).unwrap().decider;
                         let p = self.map_inbound_promise(decider, id);
                         (
                             decider,

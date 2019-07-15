@@ -1,6 +1,6 @@
-use std::fmt;
-use super::promise::PromiseID;
 use super::presence::PresenceID;
+use super::promise::PromiseID;
+use std::fmt;
 
 impl fmt::Display for PromiseID {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {

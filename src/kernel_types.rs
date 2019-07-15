@@ -44,10 +44,7 @@ pub(crate) enum Resolution {
 #[derive(Debug)]
 pub(crate) enum PendingDelivery {
     #[allow(dead_code)]
-    Deliver {
-        target: CapSlot,
-        message: Message,
-    },
+    Deliver { target: CapSlot, message: Message },
     #[allow(dead_code)]
     Notify {
         vat_id: VatID,

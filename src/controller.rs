@@ -41,7 +41,13 @@ impl Controller {
          */
     }
 
-    pub fn push(&mut self, _vat_name: &str, _target: usize, _method: &str, _args_body: &[u8]) {
+    pub fn push(
+        &mut self,
+        _vat_name: &str,
+        _target: usize,
+        _method: &str,
+        _args_body: &[u8],
+    ) {
         /*
         self.kernel.push(
             &VatName(vat_name.to_string()),

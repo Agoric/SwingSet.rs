@@ -1,5 +1,5 @@
 use super::kernel::KernelData;
-use super::kernel_types::VatID;
+use super::kernel_types::{VatID, CapSlot as KernelCapSlot};
 use super::syscall::{CapSlot, Message, Promise, Resolution, Syscall};
 use std::cell::RefCell;
 //use std::collections::HashSet;
@@ -27,21 +27,23 @@ impl VatSyscall {
         VatSyscall { vat_id, kd }
     }
 
-    /*
-    fn map_outbound_target(&self, vtarget: VatSendTarget) -> KernelTarget {
-        let kd = self.kd.borrow_mut();
-        let vd = kd.vat_data.get(&self.vat_id).unwrap();
+    fn map_outbound_target(&self, vtarget: CapSlot) -> KernelCapSlot {
+        let mut kd = self.kd.borrow_mut();
+        let vd = kd.vat_data.get_mut(&self.vat_id).unwrap();
+        use CapSlot::*;
+        use KernelCapSlot::*;
         match vtarget {
-            VatSendTarget::Import(viid) => {
-                let ke = vd.import_clist.map_outbound(viid);
-                KernelTarget::Export(ke)
-            }
-            VatSendTarget::Promise(vpid) => {
-                let kpid = vd.promise_clist.map_outbound(vpid);
-                KernelTarget::Promise(kpid)
-            }
+            // LocalPromise and Export are legal but silly: they go through
+            // the kernel run-queue and then back into this same Vat
+            //LocalPromise(id) => vd.local_promise_clist.map_outbound(id),
+            //Export(id) => vd.export_clist.map_outbound(id),
+            // RemotePromise and Import are far more sensible
+            RemotePromise(id) => Promise(vd.remote_promise_clist.get_outbound(id)),
+            Import(id) => Presence(vd.import_clist.get_outbound(id)),
+            _ => panic!(),
         }
     }
+    /*
 
     fn classify_target(&self, ktarget: KernelTarget) -> TargetCategory {
         use TargetCategory::*;
@@ -147,17 +149,14 @@ impl VatSyscall {
             resolver: okprid,
         }
     }
+     */
 
-    fn do_send(
-        &mut self,
-        vtarget: VatSendTarget,
-        vmsg: OutboundVatMessage,
-        send_only: bool,
-    ) -> Option<VatPromiseID> {
-        println!("syscall.send {}.{}", vtarget, vmsg.name);
+    fn do_send(&mut self, target: CapSlot, msg: Message) {
+        println!("syscall.send {}.{}", target, msg.method);
 
         // convert and classify the target
-        let ktarget = self.map_outbound_target(vtarget);
+        let _ktarget = self.map_outbound_target(target);
+/*
         let tc: TargetCategory = self.classify_target(ktarget);
         use TargetCategory::*;
 
@@ -204,10 +203,10 @@ impl VatSyscall {
             ToDataError | Rejected(..) => (),
         };
 
-        // and finally return the result promise (or None if send_only)
-        ovpid
+        */
     }
 
+    /*
     fn push_notify_fulfill_to_target(
         &mut self,
         vat_id: VatID,
@@ -256,8 +255,8 @@ impl VatSyscall {
 }
 
 impl Syscall for VatSyscall {
-    fn send(&mut self, _target: CapSlot, _msg: Message) {
-        //self.do_send(target, msg);
+    fn send(&mut self, target: CapSlot, msg: Message) {
+        self.do_send(target, msg);
     }
 
     fn subscribe(&mut self, _id: Promise) {

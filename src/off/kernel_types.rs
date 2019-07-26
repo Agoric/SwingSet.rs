@@ -55,3 +55,12 @@ pub(crate) enum PendingDelivery {
 
 #[derive(Debug, Default)]
 pub(crate) struct RunQueue(pub VecDeque<PendingDelivery>);
+
+pub(crate) struct Kernel {
+    pub(crate) vat_names: HashMap<VatName, VatID>,
+    pub(crate) vat_data: HashMap<VatID, VatData>,
+    pub(crate) vat_dispatch: HashMap<VatID, Box<dyn Dispatch>>,
+    pub(crate) run_queue: RunQueue,
+    pub(crate) presences: PresenceTable,
+    pub(crate) promises: PromiseTable,
+}

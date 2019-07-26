@@ -1,4 +1,5 @@
 mod clist;
+/*
 mod config;
 mod controller;
 mod display;
@@ -16,3 +17,4 @@ pub use config::{Config, Setup};
 pub use controller::Controller;
 pub use kernel_types::VatName;
 pub use syscall::{Dispatch, Syscall};
+*/

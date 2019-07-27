@@ -1,7 +1,8 @@
 mod clist;
 mod kernel;
-mod syscall;
+mod map_inbound;
 mod vat;
+mod vat_data;
 
 /*
 mod config;

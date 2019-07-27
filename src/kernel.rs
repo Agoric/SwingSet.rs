@@ -1,7 +1,7 @@
 #![allow(dead_code)]
 
-use super::clist::{CList, CListKernelEntry};
 use super::vat::{Dispatch, ObjectID as VatObjectID, PromiseID as VatPromiseID};
+use super::vat_data::VatData;
 use std::collections::{HashMap, HashSet, VecDeque};
 
 #[derive(PartialEq, Eq, Debug, Hash)]
@@ -143,25 +143,6 @@ enum PendingDelivery {
 
 #[derive(Debug, Default)]
 struct RunQueue(VecDeque<PendingDelivery>);
-
-impl CListKernelEntry for ObjectID {}
-impl CListKernelEntry for PromiseID {}
-
-#[derive(Debug)]
-pub struct VatData {
-    pub id: VatID,
-    pub object_clist: CList<ObjectID, VatObjectID>,
-    pub promise_clist: CList<PromiseID, VatPromiseID>,
-}
-impl VatData {
-    pub fn new(id: VatID) -> Self {
-        VatData {
-            id,
-            object_clist: CList::new(),
-            promise_clist: CList::new(),
-        }
-    }
-}
 
 struct Kernel {
     vat_names: HashMap<VatName, VatID>,

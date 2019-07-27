@@ -1,28 +1,14 @@
-/// This contains the functions which translate between kernel-space and
-/// vat-space.
-use super::clist::CListVatEntry;
 use super::kernel::{
     CapData as KernelCapData, CapSlot as KernelCapSlot, Message as KernelMessage,
     ObjectID as KernelObjectID, ObjectTable as KernelObjectTable,
     PromiseID as KernelPromiseID, PromiseTable as KernelPromiseTable,
-    Resolution as KernelResolution, VatData as KernelVatData,
+    Resolution as KernelResolution,
 };
 use super::vat::{
     CapData as VatCapData, CapSlot as VatCapSlot, InboundTarget, Message as VatMessage,
     ObjectID as VatObjectID, PromiseID as VatPromiseID, Resolution as VatResolution,
 };
-
-impl CListVatEntry for VatObjectID {
-    fn new(index: isize) -> Self {
-        VatObjectID(index)
-    }
-}
-
-impl CListVatEntry for VatPromiseID {
-    fn new(index: isize) -> Self {
-        VatPromiseID(index)
-    }
-}
+use super::vat_data::VatData as KernelVatData;
 
 // These functions map the arguments of "inbound" kernel->vat dispatch calls.
 // This may require allocation in the target Vat's c-lists, but not the
@@ -126,9 +112,10 @@ fn map_inbound_resolution(
 #[cfg(test)]
 mod test {
     use super::super::kernel::{
-        ObjectTable, PromiseID as KernelPromiseID, PromiseTable, VatData, VatID,
+        ObjectTable, PromiseID as KernelPromiseID, PromiseTable, VatID,
     };
     use super::super::vat::PromiseID as VatPromiseID;
+    use super::super::vat_data::VatData;
     use super::*;
 
     #[test]

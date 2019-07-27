@@ -1,18 +1,18 @@
 #![allow(dead_code)]
 
 use super::clist::{CList, CListKernelEntry};
-use super::syscall::{VatObjectID, VatPromiseID};
 use super::vat::Dispatch;
+use super::vat::{VatObjectID, VatPromiseID};
 use std::collections::{HashMap, HashSet, VecDeque};
 
 #[derive(PartialEq, Eq, Debug, Hash)]
 struct VatName(String);
 
 #[derive(PartialEq, Eq, Debug, Hash, Copy, Clone)]
-struct VatID(usize);
+pub struct VatID(usize);
 
 #[derive(Debug, Eq, PartialEq, Hash, Copy, Clone)]
-struct PresenceID(usize);
+pub struct PresenceID(usize);
 
 #[derive(Debug, Eq, PartialEq, Hash, Copy, Clone)]
 struct Presence {
@@ -46,7 +46,7 @@ impl PresenceTable {
 }
 
 #[derive(Debug, Eq, PartialEq, Hash, Copy, Clone)]
-struct PromiseID(usize);
+pub struct PromiseID(usize);
 
 #[derive(Debug, Eq, PartialEq, Clone)]
 enum PromiseState {
@@ -56,14 +56,14 @@ enum PromiseState {
     Rejected(CapData),
 }
 
-struct Promise {
+pub struct Promise {
     decider: VatID,
-    allocator: VatID,
+    pub allocator: VatID,
     state: PromiseState,
 }
 
-struct PromiseTable {
-    promises: HashMap<PromiseID, Promise>,
+pub struct PromiseTable {
+    pub promises: HashMap<PromiseID, Promise>,
     next_promise_id: usize,
 }
 
@@ -145,10 +145,10 @@ impl CListKernelEntry for PresenceID {}
 impl CListKernelEntry for PromiseID {}
 
 #[derive(Debug)]
-struct VatData {
-    id: VatID,
-    object_clist: CList<PresenceID, VatObjectID>,
-    promise_clist: CList<PromiseID, VatPromiseID>,
+pub struct VatData {
+    pub id: VatID,
+    pub object_clist: CList<PresenceID, VatObjectID>,
+    pub promise_clist: CList<PromiseID, VatPromiseID>,
 }
 
 struct Kernel {

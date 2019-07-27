@@ -1,17 +1,12 @@
 use super::clist::CListVatEntry;
-//use super::vat::{VatCapSlot, VatPromiseID};
-
-#[derive(Debug, Eq, PartialEq, Hash, Copy, Clone)]
-pub struct VatObjectID(isize);
+use super::kernel::{PromiseID, PromiseTable, VatData};
+use super::vat::{VatObjectID, VatPromiseID};
 
 impl CListVatEntry for VatObjectID {
     fn new(index: isize) -> Self {
         VatObjectID(index)
     }
 }
-
-#[derive(Debug, Eq, PartialEq, Hash, Copy, Clone)]
-pub struct VatPromiseID(isize);
 
 impl CListVatEntry for VatPromiseID {
     fn new(index: isize) -> Self {
@@ -23,16 +18,20 @@ impl CListVatEntry for VatPromiseID {
 // This may require allocation in the target Vat's c-lists, but not the
 // kernel tables.
 
-/*
-fn map_inbound_promise(vd: &mut VatData, pt: &PromiseTable, id: PromiseID) -> VatPromise {
-    let allocator = pt.get(&id).unwrap().allocator;
+fn map_inbound_promise(
+    vd: &mut VatData,
+    pt: &PromiseTable,
+    id: PromiseID,
+) -> VatPromiseID {
+    let allocator = pt.promises.get(&id).unwrap().allocator;
     if allocator == vd.id {
-        VatPromise::LocalPromise(vd.local_promise_clist.map_inbound(id))
+        // this is returning home. It should be in the clist already.
+        vd.promise_clist.get_inbound(id).unwrap()
     } else {
-        VatPromise::RemotePromise(vd.remote_promise_clist.map_inbound(id))
+        // this is coming from afar, so allocate if necessary
+        vd.promise_clist.map_inbound(id)
     }
 }
-*/
 
 /*
 fn map_inbound_slot(vd: &mut VataData, slot: CapSlot) -> VatCapSlot {

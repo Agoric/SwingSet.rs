@@ -8,20 +8,20 @@ use std::collections::HashMap;
 // mapping might be "allocate if necessary", "must already be present", or
 // "must not be present".
 
-trait CListVatEntry: Eq + Hash + Copy {
+pub trait CListVatEntry: Eq + Hash + Copy {
     fn new(index: usize) -> Self;
 }
 
-trait CListKernelEntry: Eq + Hash + Copy {
-    fn new(index: usize) -> Self;
+pub trait CListKernelEntry: Eq + Hash + Copy {
 }
 
-#[derive(Debug, Default)]
-struct CList<KT: CListKernelEntry, VT: CListVatEntry> {
+#[derive(Debug)]
+pub struct CList<KT: CListKernelEntry, VT: CListVatEntry> {
     inbound: HashMap<KT, VT>,
     outbound: HashMap<VT, KT>,
     next_vat_index: usize,
 }
+
 impl<KT: CListKernelEntry, VT: CListVatEntry> CList<KT, VT> {
     pub fn new() -> Self {
         CList {
@@ -101,11 +101,7 @@ mod test {
 
     #[derive(Debug, Eq, PartialEq, Hash, Clone, Copy)]
     struct KType(usize);
-    impl CListKernelEntry for KType {
-        fn new(index: usize) -> KType {
-            KType(index)
-        }
-    }
+    impl CListKernelEntry for KType {}
     #[derive(Debug, Eq, PartialEq, Hash, Clone, Copy)]
     struct VType(usize);
     impl CListVatEntry for VType {

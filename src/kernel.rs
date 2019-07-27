@@ -1,6 +1,7 @@
 #![allow(dead_code)]
 
 use std::collections::{HashMap, HashSet, VecDeque};
+use super::clist::{CListVatEntry, CListKernelEntry, CList};
 
 #[derive(PartialEq, Eq, Debug, Hash)]
 struct VatName(String);
@@ -22,7 +23,7 @@ struct PresenceTable {
 }
 
 impl PresenceTable {
-    fn default() -> PresenceTable {
+    fn new() -> PresenceTable {
         PresenceTable {
             presences: HashMap::default(),
             next_presence_id: 0,
@@ -45,7 +46,7 @@ impl PresenceTable {
 #[derive(Debug, Eq, PartialEq, Hash, Copy, Clone)]
 struct PromiseID(usize);
 
-//#[derive(Debug, Eq, PartialEq, Hash, Copy, Clone)]
+#[derive(Debug, Eq, PartialEq, Clone)]
 enum PromiseState {
     Unresolved { subscribers: HashSet<VatID> },
     FulfilledToTarget(PresenceID),
@@ -65,7 +66,7 @@ struct PromiseTable {
 }
 
 impl PromiseTable {
-    fn default() -> PromiseTable {
+    fn new() -> PromiseTable {
         PromiseTable {
             promises: HashMap::default(),
             next_promise_id: 0,
@@ -102,7 +103,7 @@ enum CapSlot {
 
 /// CapData is capability-bearing data, used for the message arguments and
 /// resolving/rejecting promises to non-callable targets
-#[derive(Debug, Clone)]
+#[derive(Debug, Eq, PartialEq, Clone)]
 struct CapData {
     body: Vec<u8>,
     slots: Vec<CapSlot>,
@@ -135,11 +136,36 @@ enum PendingDelivery {
     },
 }
 
-#[derive(Debug, Default)]
+#[derive(Debug)]
 struct RunQueue(VecDeque<PendingDelivery>);
 
-#[derive(Debug, Default)]
-struct VatData {}
+impl CListKernelEntry for PresenceID {}
+
+#[derive(Debug, Eq, PartialEq, Hash, Copy, Clone)]
+struct VatPresenceID(usize);
+
+impl CListVatEntry for VatPresenceID {
+    fn new(index: usize) -> Self {
+        VatPresenceID(index)
+    }
+}
+
+impl CListKernelEntry for PromiseID {}
+
+#[derive(Debug, Eq, PartialEq, Hash, Copy, Clone)]
+struct VatPromiseID(usize);
+
+impl CListVatEntry for VatPromiseID {
+    fn new(index: usize) -> Self {
+        VatPromiseID(index)
+    }
+}
+
+#[derive(Debug)]
+struct VatData {
+    presence_clist: CList<PresenceID, VatPresenceID>,
+    promise_clist: CList<PromiseID, VatPromiseID>,
+}
 
 trait Dispatch {}
 

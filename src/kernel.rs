@@ -8,7 +8,7 @@ use std::collections::{HashMap, HashSet, VecDeque};
 struct VatName(String);
 
 #[derive(PartialEq, Eq, Debug, Hash, Copy, Clone)]
-pub struct VatID(usize);
+pub struct VatID(pub usize);
 
 #[derive(Debug, Eq, PartialEq, Hash, Copy, Clone)]
 pub struct ObjectID(usize);
@@ -24,14 +24,14 @@ pub struct ObjectTable {
 }
 
 impl ObjectTable {
-    fn new() -> ObjectTable {
+    pub fn new() -> ObjectTable {
         ObjectTable {
             objects: HashMap::default(),
             next_object_id: 0,
         }
     }
 
-    fn allocate(&mut self, owner: VatID) -> ObjectID {
+    pub fn allocate(&mut self, owner: VatID) -> ObjectID {
         let id = ObjectID(self.next_object_id);
         self.next_object_id += 1;
         let o = Object { owner };
@@ -39,13 +39,13 @@ impl ObjectTable {
         id
     }
 
-    fn owner_of(&mut self, id: ObjectID) -> VatID {
+    pub fn owner_of(&self, id: ObjectID) -> VatID {
         self.objects.get(&id).unwrap().owner
     }
 }
 
 #[derive(Debug, Eq, PartialEq, Hash, Copy, Clone)]
-pub struct PromiseID(usize);
+pub struct PromiseID(pub usize);
 
 #[derive(Debug, Eq, PartialEq, Clone)]
 enum PromiseState {
@@ -67,14 +67,14 @@ pub struct PromiseTable {
 }
 
 impl PromiseTable {
-    fn new() -> PromiseTable {
+    pub fn new() -> PromiseTable {
         PromiseTable {
             promises: HashMap::default(),
             next_promise_id: 0,
         }
     }
 
-    fn allocate_unresolved(&mut self, decider: VatID, allocator: VatID) -> PromiseID {
+    pub fn allocate_unresolved(&mut self, decider: VatID, allocator: VatID) -> PromiseID {
         let id = PromiseID(self.next_promise_id);
         self.next_promise_id += 1;
         let state = PromiseState::Unresolved {
@@ -91,7 +91,11 @@ impl PromiseTable {
         id
     }
 
-    fn decider_of(&mut self, id: PromiseID) -> VatID {
+    pub fn allocator_of(&self, id: PromiseID) -> VatID {
+        self.promises.get(&id).unwrap().allocator
+    }
+
+    pub fn decider_of(&self, id: PromiseID) -> VatID {
         self.promises.get(&id).unwrap().decider
     }
 }
@@ -137,7 +141,7 @@ enum PendingDelivery {
     },
 }
 
-#[derive(Debug)]
+#[derive(Debug, Default)]
 struct RunQueue(VecDeque<PendingDelivery>);
 
 impl CListKernelEntry for ObjectID {}
@@ -149,6 +153,15 @@ pub struct VatData {
     pub object_clist: CList<ObjectID, VatObjectID>,
     pub promise_clist: CList<PromiseID, VatPromiseID>,
 }
+impl VatData {
+    pub fn new(id: VatID) -> Self {
+        VatData {
+            id,
+            object_clist: CList::new(),
+            promise_clist: CList::new(),
+        }
+    }
+}
 
 struct Kernel {
     vat_names: HashMap<VatName, VatID>,
@@ -157,4 +170,27 @@ struct Kernel {
     objects: ObjectTable,
     promises: PromiseTable,
     run_queue: RunQueue,
+}
+
+impl Kernel {
+    fn new() -> Self {
+        Kernel {
+            vat_names: HashMap::default(),
+            vat_dispatch: HashMap::default(),
+            vat_data: HashMap::default(),
+            objects: ObjectTable::new(),
+            promises: PromiseTable::new(),
+            run_queue: RunQueue::default(),
+        }
+    }
+}
+
+#[cfg(test)]
+mod test {
+    use super::*;
+
+    #[test]
+    fn test_create() {
+        let mut _k = Kernel::new();
+    }
 }

@@ -1,7 +1,8 @@
 #![allow(dead_code)]
 
 use super::clist::{CList, CListKernelEntry};
-use super::vat::{VatPresenceID, VatPromiseID};
+use super::syscall::{VatObjectID, VatPromiseID};
+use super::vat::Dispatch;
 use std::collections::{HashMap, HashSet, VecDeque};
 
 #[derive(PartialEq, Eq, Debug, Hash)]
@@ -145,11 +146,10 @@ impl CListKernelEntry for PromiseID {}
 
 #[derive(Debug)]
 struct VatData {
-    presence_clist: CList<PresenceID, VatPresenceID>,
+    id: VatID,
+    object_clist: CList<PresenceID, VatObjectID>,
     promise_clist: CList<PromiseID, VatPromiseID>,
 }
-
-trait Dispatch {}
 
 struct Kernel {
     vat_names: HashMap<VatName, VatID>,

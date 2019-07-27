@@ -1,5 +1,6 @@
 mod clist;
 mod kernel;
+mod syscall;
 mod vat;
 
 /*

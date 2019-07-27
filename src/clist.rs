@@ -8,8 +8,12 @@ use std::collections::HashMap;
 // mapping might be "allocate if necessary", "must already be present", or
 // "must not be present".
 
+// The vat-side identifier is a signed integer: positive if the Vat allocated
+// the object, negative if the kernel allocated it. The kernel-side
+// identifier is always positive.
+
 pub trait CListVatEntry: Eq + Hash + Copy {
-    fn new(index: usize) -> Self;
+    fn new(index: isize) -> Self;
 }
 
 pub trait CListKernelEntry: Eq + Hash + Copy {}
@@ -18,7 +22,7 @@ pub trait CListKernelEntry: Eq + Hash + Copy {}
 pub struct CList<KT: CListKernelEntry, VT: CListVatEntry> {
     inbound: HashMap<KT, VT>,
     outbound: HashMap<VT, KT>,
-    next_vat_index: usize,
+    next_vat_index: isize,
 }
 
 impl<KT: CListKernelEntry, VT: CListVatEntry> CList<KT, VT> {
@@ -26,7 +30,7 @@ impl<KT: CListKernelEntry, VT: CListVatEntry> CList<KT, VT> {
         CList {
             inbound: HashMap::new(),
             outbound: HashMap::new(),
-            next_vat_index: 0,
+            next_vat_index: -1,
         }
     }
 
@@ -67,14 +71,14 @@ impl<KT: CListKernelEntry, VT: CListVatEntry> CList<KT, VT> {
 
     /// kernel objects being sent inbound (from the kernel, into the vat)
     /// might already exist, or they might need to allocate new vat-side
-    /// identifiers. The vat-side identifier is just a number, so we can
-    /// allocate it here without an external closure.
+    /// identifiers. The vat-side identifier is just a (negative) number, so
+    /// we can allocate it here without an external closure.
     pub fn map_inbound(&mut self, kernel_object: KT) -> VT {
         match self.inbound.get(&kernel_object) {
             Some(&vo) => vo,
             None => {
                 let vat_object = VT::new(self.next_vat_index);
-                self.next_vat_index += 1;
+                self.next_vat_index -= 1;
                 self.inbound.insert(kernel_object, vat_object);
                 self.outbound.insert(vat_object, kernel_object);
                 vat_object
@@ -102,9 +106,9 @@ mod test {
     struct KType(usize);
     impl CListKernelEntry for KType {}
     #[derive(Debug, Eq, PartialEq, Hash, Clone, Copy)]
-    struct VType(usize);
+    struct VType(isize);
     impl CListVatEntry for VType {
-        fn new(index: usize) -> Self {
+        fn new(index: isize) -> Self {
             VType(index)
         }
     }
@@ -135,6 +139,19 @@ mod test {
         assert_eq!(c.map_outbound(vbad, || KType(44)), KType(44));
         assert_eq!(c.get_outbound(vbad), Some(KType(44)));
         assert_eq!(c.map_outbound(vbad, || KType(45)), KType(44));
+    }
+
+    #[test]
+    fn test_missing_inbound() {
+        let mut c = CList::<KType, VType>::new();
+        let kbad = KType(666);
+        assert_eq!(c.get_inbound(kbad), None);
+        assert_eq!(c.map_inbound(kbad), VType(-1));
+        assert_eq!(c.get_inbound(kbad), Some(VType(-1)));
+        assert_eq!(c.map_inbound(kbad), VType(-1));
+        assert_eq!(c.map_inbound(KType(333)), VType(-2));
+        assert_eq!(c.map_inbound(KType(333)), VType(-2));
+        assert_eq!(c.map_inbound(KType(334)), VType(-3));
     }
 
     #[test]

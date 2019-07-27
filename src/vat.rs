@@ -1,5 +1,6 @@
-/// This defines the dispatch/syscall API (the two function groups at the
-/// boundary between Vat and Kernel), and the types used in them.
+/// This file defines everything that comes into contact with Vat code: the
+/// dispatch/syscall API (the two function groups at the boundary between Vat
+/// and Kernel), and the types used in them.
 ///
 /// There are four kinds of references that make an appearance in the
 /// dispatch/syscall API: the cross-product of two properties (all from the
@@ -22,14 +23,14 @@
 // TODO: we need a name for the pass-by-presence type. "target"? "export"?
 
 #[derive(Debug, Eq, PartialEq, Hash, Copy, Clone)]
-pub struct VatPromiseID(pub isize);
+pub struct PromiseID(pub isize);
 #[derive(Debug, Eq, PartialEq, Hash, Copy, Clone)]
-pub struct VatObjectID(pub isize);
+pub struct ObjectID(pub isize);
 
 #[derive(Debug, Eq, PartialEq, Hash, Copy, Clone)]
-pub enum VatCapSlot {
-    Promise(VatPromiseID),
-    Object(VatObjectID),
+pub enum CapSlot {
+    Promise(PromiseID),
+    Object(ObjectID),
 }
 
 /// CapData is capability-bearing data, used for the message arguments and
@@ -37,28 +38,28 @@ pub enum VatCapSlot {
 #[derive(Debug, Clone)]
 pub struct CapData {
     pub body: Vec<u8>,
-    pub slots: Vec<VatCapSlot>,
+    pub slots: Vec<CapSlot>,
 }
 
 pub struct Message {
     pub method: String,
     pub args: CapData,
-    pub result: Option<VatPromiseID>,
+    pub result: Option<PromiseID>,
 }
 
 pub enum Resolution {
-    Reference(VatCapSlot),
+    Reference(CapSlot),
     Data(CapData),
     Rejection(CapData),
 }
 
 pub enum InboundTarget {
-    Promise(VatPromiseID),
-    Object(VatObjectID),
+    Promise(PromiseID),
+    Object(ObjectID),
 }
 
 pub trait Dispatch {
     fn deliver(&mut self, target: InboundTarget, msg: Message);
-    fn subscribe(&mut self, id: VatPromiseID);
-    fn notify_resolved(&mut self, id: VatPromiseID, to: Resolution);
+    fn subscribe(&mut self, id: PromiseID);
+    fn notify_resolved(&mut self, id: PromiseID, to: Resolution);
 }

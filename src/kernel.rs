@@ -1,8 +1,7 @@
 #![allow(dead_code)]
 
 use super::clist::{CList, CListKernelEntry};
-use super::vat::Dispatch;
-use super::vat::{VatObjectID, VatPromiseID};
+use super::vat::{Dispatch, ObjectID as VatObjectID, PromiseID as VatPromiseID};
 use std::collections::{HashMap, HashSet, VecDeque};
 
 #[derive(PartialEq, Eq, Debug, Hash)]

@@ -1,6 +1,14 @@
+/// This contains the functions which translate between kernel-space and
+/// vat-space.
 use super::clist::CListVatEntry;
-use super::kernel::{CapSlot, ObjectID, ObjectTable, PromiseID, PromiseTable, VatData};
-use super::vat::{VatCapSlot, VatObjectID, VatPromiseID};
+use super::kernel::{
+    CapSlot as KernelCapSlot, ObjectID as KernelObjectID,
+    ObjectTable as KernelObjectTable, PromiseID as KernelPromiseID,
+    PromiseTable as KernelPromiseTable, VatData as KernelVatData,
+};
+use super::vat::{
+    CapSlot as VatCapSlot, ObjectID as VatObjectID, PromiseID as VatPromiseID,
+};
 
 impl CListVatEntry for VatObjectID {
     fn new(index: isize) -> Self {
@@ -19,9 +27,9 @@ impl CListVatEntry for VatPromiseID {
 // kernel tables.
 
 fn map_inbound_promise(
-    vd: &mut VatData,
-    pt: &PromiseTable,
-    id: PromiseID,
+    vd: &mut KernelVatData,
+    pt: &KernelPromiseTable,
+    id: KernelPromiseID,
 ) -> VatPromiseID {
     let allocator = pt.promises.get(&id).unwrap().allocator;
     if allocator == vd.id {
@@ -34,13 +42,13 @@ fn map_inbound_promise(
 }
 
 fn map_inbound_slot(
-    vd: &mut VatData,
-    ot: &ObjectTable,
-    pt: &PromiseTable,
-    slot: CapSlot,
+    vd: &mut KernelVatData,
+    ot: &KernelObjectTable,
+    pt: &KernelPromiseTable,
+    slot: KernelCapSlot,
 ) -> VatCapSlot {
     match slot {
-        CapSlot::Object(id) => VatCapSlot::Object({
+        KernelCapSlot::Object(id) => VatCapSlot::Object({
             let owner = ot.objects.get(&id).unwrap().owner;
             if owner == vd.id {
                 // this is returning home
@@ -49,6 +57,8 @@ fn map_inbound_slot(
                 vd.object_clist.map_inbound(id)
             }
         }),
-        CapSlot::Promise(id) => VatCapSlot::Promise(map_inbound_promise(vd, pt, id)),
+        KernelCapSlot::Promise(id) => {
+            VatCapSlot::Promise(map_inbound_promise(vd, pt, id))
+        }
     }
 }

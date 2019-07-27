@@ -12,8 +12,7 @@ pub trait CListVatEntry: Eq + Hash + Copy {
     fn new(index: usize) -> Self;
 }
 
-pub trait CListKernelEntry: Eq + Hash + Copy {
-}
+pub trait CListKernelEntry: Eq + Hash + Copy {}
 
 #[derive(Debug)]
 pub struct CList<KT: CListKernelEntry, VT: CListVatEntry> {

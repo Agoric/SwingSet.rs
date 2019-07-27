@@ -1,11 +1,12 @@
 mod clist;
+mod kernel;
+mod vat;
+
 /*
 mod config;
 mod controller;
 mod display;
-*/
 mod kernel;
-/*
 mod kernel_display;
 mod kernel_types;
 mod presence;

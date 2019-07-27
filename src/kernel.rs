@@ -1,7 +1,8 @@
 #![allow(dead_code)]
 
+use super::clist::{CList, CListKernelEntry};
+use super::vat::{VatPresenceID, VatPromiseID};
 use std::collections::{HashMap, HashSet, VecDeque};
-use super::clist::{CListVatEntry, CListKernelEntry, CList};
 
 #[derive(PartialEq, Eq, Debug, Hash)]
 struct VatName(String);
@@ -140,26 +141,7 @@ enum PendingDelivery {
 struct RunQueue(VecDeque<PendingDelivery>);
 
 impl CListKernelEntry for PresenceID {}
-
-#[derive(Debug, Eq, PartialEq, Hash, Copy, Clone)]
-struct VatPresenceID(usize);
-
-impl CListVatEntry for VatPresenceID {
-    fn new(index: usize) -> Self {
-        VatPresenceID(index)
-    }
-}
-
 impl CListKernelEntry for PromiseID {}
-
-#[derive(Debug, Eq, PartialEq, Hash, Copy, Clone)]
-struct VatPromiseID(usize);
-
-impl CListVatEntry for VatPromiseID {
-    fn new(index: usize) -> Self {
-        VatPromiseID(index)
-    }
-}
 
 #[derive(Debug)]
 struct VatData {
@@ -171,9 +153,9 @@ trait Dispatch {}
 
 struct Kernel {
     vat_names: HashMap<VatName, VatID>,
-    vat_data: HashMap<VatID, VatData>,
     vat_dispatch: HashMap<VatID, Box<dyn Dispatch>>,
-    run_queue: RunQueue,
+    vat_data: HashMap<VatID, VatData>,
     presences: PresenceTable,
     promises: PromiseTable,
+    run_queue: RunQueue,
 }

@@ -1,3 +1,5 @@
+#![allow(dead_code)]
+
 use core::hash::Hash;
 use std::collections::HashMap;
 
@@ -6,18 +8,18 @@ use std::collections::HashMap;
 // mapping might be "allocate if necessary", "must already be present", or
 // "must not be present".
 
-pub(crate) trait CListVatEntry: Eq + Hash + Copy {
+trait CListVatEntry: Eq + Hash + Copy {
     fn new(index: usize) -> Self;
 }
 
-pub(crate) trait CListKernelEntry: Eq + Hash + Copy {
+trait CListKernelEntry: Eq + Hash + Copy {
     fn new(index: usize) -> Self;
 }
 
 #[derive(Debug, Default)]
-pub(crate) struct CList<KT: CListKernelEntry, VT: CListVatEntry> {
-    pub(crate) inbound: HashMap<KT, VT>,
-    pub(crate) outbound: HashMap<VT, KT>,
+struct CList<KT: CListKernelEntry, VT: CListVatEntry> {
+    inbound: HashMap<KT, VT>,
+    outbound: HashMap<VT, KT>,
     next_vat_index: usize,
 }
 impl<KT: CListKernelEntry, VT: CListVatEntry> CList<KT, VT> {

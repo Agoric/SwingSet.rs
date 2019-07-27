@@ -2,12 +2,14 @@
 /// vat-space.
 use super::clist::CListVatEntry;
 use super::kernel::{
-    CapSlot as KernelCapSlot, ObjectID as KernelObjectID,
-    ObjectTable as KernelObjectTable, PromiseID as KernelPromiseID,
-    PromiseTable as KernelPromiseTable, VatData as KernelVatData,
+    CapData as KernelCapData, CapSlot as KernelCapSlot, Message as KernelMessage,
+    ObjectID as KernelObjectID, ObjectTable as KernelObjectTable,
+    PromiseID as KernelPromiseID, PromiseTable as KernelPromiseTable,
+    Resolution as KernelResolution, VatData as KernelVatData,
 };
 use super::vat::{
-    CapSlot as VatCapSlot, ObjectID as VatObjectID, PromiseID as VatPromiseID,
+    CapData as VatCapData, CapSlot as VatCapSlot, InboundTarget, Message as VatMessage,
+    ObjectID as VatObjectID, PromiseID as VatPromiseID, Resolution as VatResolution,
 };
 
 impl CListVatEntry for VatObjectID {
@@ -57,6 +59,66 @@ fn map_inbound_slot(
         }),
         KernelCapSlot::Promise(id) => {
             VatCapSlot::Promise(map_inbound_promise(vd, pt, id))
+        }
+    }
+}
+
+fn map_inbound_target(
+    vd: &mut KernelVatData,
+    ot: &KernelObjectTable,
+    pt: &KernelPromiseTable,
+    target: KernelCapSlot,
+) -> InboundTarget {
+    match map_inbound_slot(vd, ot, pt, target) {
+        VatCapSlot::Object(id) => InboundTarget::Object(id),
+        VatCapSlot::Promise(id) => InboundTarget::Promise(id),
+    }
+}
+
+fn map_inbound_capdata(
+    vd: &mut KernelVatData,
+    ot: &KernelObjectTable,
+    pt: &KernelPromiseTable,
+    data: KernelCapData,
+) -> VatCapData {
+    VatCapData {
+        body: data.body,
+        slots: data
+            .slots
+            .iter()
+            .map(|s| map_inbound_slot(vd, ot, pt, *s))
+            .collect(),
+    }
+}
+
+fn map_inbound_message(
+    vd: &mut KernelVatData,
+    ot: &KernelObjectTable,
+    pt: &KernelPromiseTable,
+    message: KernelMessage,
+) -> VatMessage {
+    VatMessage {
+        method: message.method,
+        args: map_inbound_capdata(vd, ot, pt, message.args),
+        result: message.result.map(|rp| map_inbound_promise(vd, pt, rp)),
+    }
+}
+
+fn map_inbound_resolution(
+    vd: &mut KernelVatData,
+    ot: &KernelObjectTable,
+    pt: &KernelPromiseTable,
+    resolution: KernelResolution,
+) -> VatResolution {
+    match resolution {
+        KernelResolution::Reference(s) => {
+            VatResolution::Reference(map_inbound_slot(vd, ot, pt, s))
+        }
+        KernelResolution::Data(d) => {
+            VatResolution::Data(map_inbound_capdata(vd, ot, pt, d))
+        }
+        KernelResolution::Rejection(d) => {
+            VatResolution::Rejection(map_inbound_capdata(vd, ot, pt, d))
         }
     }
 }

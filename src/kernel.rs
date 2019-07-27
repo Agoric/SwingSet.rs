@@ -109,20 +109,20 @@ pub enum CapSlot {
 /// CapData is capability-bearing data, used for the message arguments and
 /// resolving/rejecting promises to non-callable targets
 #[derive(Debug, Eq, PartialEq, Clone)]
-struct CapData {
-    body: Vec<u8>,
-    slots: Vec<CapSlot>,
+pub struct CapData {
+    pub body: Vec<u8>,
+    pub slots: Vec<CapSlot>,
 }
 
 #[derive(Debug)]
-struct Message {
-    method: String,
-    args: CapData,
-    result: Option<PromiseID>,
+pub struct Message {
+    pub method: String,
+    pub args: CapData,
+    pub result: Option<PromiseID>,
 }
 
 #[derive(Debug)]
-enum Resolution {
+pub enum Resolution {
     Reference(CapSlot),
     Data(CapData),
     Rejection(CapData),

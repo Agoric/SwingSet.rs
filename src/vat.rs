@@ -63,3 +63,10 @@ pub trait Dispatch {
     fn subscribe(&mut self, id: PromiseID);
     fn notify_resolved(&mut self, id: PromiseID, to: Resolution);
 }
+
+pub trait Syscall {
+    fn send(&mut self, target: CapSlot, msg: Message);
+    //fn invoke(&mut self, target: OutboundDeviceNode, msg: DeviceMessage) -> CapData;
+    fn subscribe(&mut self, id: PromiseID);
+    fn resolve(&mut self, id: PromiseID, to: Resolution);
+}

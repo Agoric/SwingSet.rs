@@ -1,6 +1,7 @@
 mod clist;
 mod kernel;
 mod map_inbound;
+mod map_outbound;
 mod vat;
 mod vat_data;
 

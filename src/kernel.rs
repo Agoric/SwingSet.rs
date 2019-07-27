@@ -12,36 +12,36 @@ struct VatName(String);
 pub struct VatID(usize);
 
 #[derive(Debug, Eq, PartialEq, Hash, Copy, Clone)]
-pub struct PresenceID(usize);
+pub struct ObjectID(usize);
 
 #[derive(Debug, Eq, PartialEq, Hash, Copy, Clone)]
-struct Presence {
-    owner: VatID,
+pub struct Object {
+    pub owner: VatID,
 }
 
-struct PresenceTable {
-    presences: HashMap<PresenceID, Presence>,
-    next_presence_id: usize,
+pub struct ObjectTable {
+    pub objects: HashMap<ObjectID, Object>,
+    next_object_id: usize,
 }
 
-impl PresenceTable {
-    fn new() -> PresenceTable {
-        PresenceTable {
-            presences: HashMap::default(),
-            next_presence_id: 0,
+impl ObjectTable {
+    fn new() -> ObjectTable {
+        ObjectTable {
+            objects: HashMap::default(),
+            next_object_id: 0,
         }
     }
 
-    fn allocate(&mut self, owner: VatID) -> PresenceID {
-        let id = PresenceID(self.next_presence_id);
-        self.next_presence_id += 1;
-        let p = Presence { owner };
-        self.presences.insert(id, p);
+    fn allocate(&mut self, owner: VatID) -> ObjectID {
+        let id = ObjectID(self.next_object_id);
+        self.next_object_id += 1;
+        let o = Object { owner };
+        self.objects.insert(id, o);
         id
     }
 
-    fn owner_of(&mut self, id: PresenceID) -> VatID {
-        self.presences.get(&id).unwrap().owner
+    fn owner_of(&mut self, id: ObjectID) -> VatID {
+        self.objects.get(&id).unwrap().owner
     }
 }
 
@@ -51,7 +51,7 @@ pub struct PromiseID(usize);
 #[derive(Debug, Eq, PartialEq, Clone)]
 enum PromiseState {
     Unresolved { subscribers: HashSet<VatID> },
-    FulfilledToTarget(PresenceID),
+    FulfilledToTarget(ObjectID),
     FulfilledToData(CapData),
     Rejected(CapData),
 }
@@ -98,8 +98,8 @@ impl PromiseTable {
 }
 
 #[derive(Debug, Eq, PartialEq, Hash, Copy, Clone)]
-enum CapSlot {
-    Presence(PresenceID),
+pub enum CapSlot {
+    Object(ObjectID),
     Promise(PromiseID),
 }
 
@@ -141,13 +141,13 @@ enum PendingDelivery {
 #[derive(Debug)]
 struct RunQueue(VecDeque<PendingDelivery>);
 
-impl CListKernelEntry for PresenceID {}
+impl CListKernelEntry for ObjectID {}
 impl CListKernelEntry for PromiseID {}
 
 #[derive(Debug)]
 pub struct VatData {
     pub id: VatID,
-    pub object_clist: CList<PresenceID, VatObjectID>,
+    pub object_clist: CList<ObjectID, VatObjectID>,
     pub promise_clist: CList<PromiseID, VatPromiseID>,
 }
 
@@ -155,7 +155,7 @@ struct Kernel {
     vat_names: HashMap<VatName, VatID>,
     vat_dispatch: HashMap<VatID, Box<dyn Dispatch>>,
     vat_data: HashMap<VatID, VatData>,
-    presences: PresenceTable,
+    objects: ObjectTable,
     promises: PromiseTable,
     run_queue: RunQueue,
 }

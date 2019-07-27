@@ -1,6 +1,6 @@
 use super::clist::CListVatEntry;
-use super::kernel::{PromiseID, PromiseTable, VatData};
-use super::vat::{VatObjectID, VatPromiseID};
+use super::kernel::{CapSlot, ObjectID, ObjectTable, PromiseID, PromiseTable, VatData};
+use super::vat::{VatCapSlot, VatObjectID, VatPromiseID};
 
 impl CListVatEntry for VatObjectID {
     fn new(index: isize) -> Self {
@@ -33,23 +33,22 @@ fn map_inbound_promise(
     }
 }
 
-/*
-fn map_inbound_slot(vd: &mut VataData, slot: CapSlot) -> VatCapSlot {
+fn map_inbound_slot(
+    vd: &mut VatData,
+    ot: &ObjectTable,
+    pt: &PromiseTable,
+    slot: CapSlot,
+) -> VatCapSlot {
     match slot {
-        CapSlot::Presence(id) => {
-            let mut kd = self.kd.borrow_mut();
-            let owner = kd.presences.presences.get(&id).unwrap().owner;
-            let vd = kd.vat_data.get_mut(&owner).unwrap();
-            if to == owner {
-                VatCapSlot::Export(vd.export_clist.get_inbound(id))
+        CapSlot::Object(id) => VatCapSlot::Object({
+            let owner = ot.objects.get(&id).unwrap().owner;
+            if owner == vd.id {
+                // this is returning home
+                vd.object_clist.get_inbound(id).unwrap()
             } else {
-                VatCapSlot::Import(vd.import_clist.map_inbound(id))
+                vd.object_clist.map_inbound(id)
             }
-        }
-        CapSlot::Promise(id) => match self.map_inbound_promise(to, id) {
-            VatPromise::LocalPromise(pid) => VatCapSlot::LocalPromise(pid),
-            VatPromise::RemotePromise(pid) => VatCapSlot::RemotePromise(pid),
-        },
+        }),
+        CapSlot::Promise(id) => VatCapSlot::Promise(map_inbound_promise(vd, pt, id)),
     }
 }
-*/

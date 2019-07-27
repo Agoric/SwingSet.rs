@@ -27,7 +27,7 @@ pub struct VatPromiseID(pub isize);
 pub struct VatObjectID(pub isize);
 
 #[derive(Debug, Eq, PartialEq, Hash, Copy, Clone)]
-pub enum CapSlot {
+pub enum VatCapSlot {
     Promise(VatPromiseID),
     Object(VatObjectID),
 }
@@ -37,7 +37,7 @@ pub enum CapSlot {
 #[derive(Debug, Clone)]
 pub struct CapData {
     pub body: Vec<u8>,
-    pub slots: Vec<CapSlot>,
+    pub slots: Vec<VatCapSlot>,
 }
 
 pub struct Message {
@@ -47,7 +47,7 @@ pub struct Message {
 }
 
 pub enum Resolution {
-    Reference(CapSlot),
+    Reference(VatCapSlot),
     Data(CapData),
     Rejection(CapData),
 }

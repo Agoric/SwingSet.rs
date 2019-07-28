@@ -75,6 +75,8 @@ fn map_outbound_message(
     ot: &mut KernelObjectTable,
     message: VatMessage,
 ) -> KernelMessage {
+    // look up the target first, promise or object, and find it's decider/owner
+    // then if a result promise must be allocated, use that as the decider
     KernelMessage {
         method: message.method,
         args: map_outbound_capdata(vd, pt, ot, message.args),

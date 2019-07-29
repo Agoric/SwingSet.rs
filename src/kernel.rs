@@ -146,7 +146,7 @@ pub enum PendingDelivery {
 }
 
 #[derive(Debug, Default)]
-struct RunQueue(VecDeque<PendingDelivery>);
+pub struct RunQueue(VecDeque<PendingDelivery>);
 
 struct Kernel {
     vat_names: HashMap<VatName, VatID>,
@@ -182,7 +182,13 @@ impl Kernel {
                 let vt = map_inbound_target(vd, ot, pt, target);
                 let vmsg = map_inbound_message(vd, ot, pt, message);
                 //drop(vd);
-                let mut s = SyscallHandler::new();
+                let mut s = SyscallHandler::new(
+                    vat_id,
+                    &mut self.vat_data,
+                    &mut self.objects,
+                    &mut self.promises,
+                    &mut self.run_queue,
+                );
                 let dispatch = self.vat_dispatch.get_mut(&vat_id).unwrap();
                 dispatch.deliver(&mut s, vt, vmsg)
             }
@@ -195,7 +201,13 @@ impl Kernel {
                 let vpid = map_inbound_promise(vd, pt, promise);
                 let vres = map_inbound_resolution(vd, ot, pt, resolution);
                 //drop(vd);
-                let mut s = SyscallHandler::new();
+                let mut s = SyscallHandler::new(
+                    vat_id,
+                    &mut self.vat_data,
+                    &mut self.objects,
+                    &mut self.promises,
+                    &mut self.run_queue,
+                );
                 let dispatch = self.vat_dispatch.get_mut(&vat_id).unwrap();
                 dispatch.notify_resolved(&mut s, vpid, vres)
             }

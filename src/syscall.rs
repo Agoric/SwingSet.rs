@@ -1,7 +1,6 @@
 use super::kernel::{
-    delivery_type, send_resolution, DeliveryType, ObjectTable, PendingDelivery,
-    PromiseID as KernelPromiseID, PromiseTable, Resolution as KernelResolution, RunQueue,
-    VatID,
+    delivery_type, send_resolution, DeliveryType, ObjectTable, PromiseTable,
+    Resolution as KernelResolution, RunQueue, VatID,
 };
 use super::map_outbound::{
     get_outbound_promise, get_outbound_slot, map_outbound_resolution, map_outbound_send,
@@ -47,7 +46,7 @@ impl<'a> SyscallHandler<'a> {
 impl<'a> Syscall for SyscallHandler<'a> {
     fn send(&mut self, target: VatCapSlot, msg: VatMessage) {
         let vd = self.vat_data.get_mut(&self.for_vat).unwrap();
-        let ktarget = get_outbound_slot(vd, self.promises, self.objects, target);
+        let ktarget = get_outbound_slot(vd, target);
         let dt = delivery_type(ktarget, self.objects, self.promises);
         use DeliveryType::*;
         match dt {
@@ -66,7 +65,7 @@ impl<'a> Syscall for SyscallHandler<'a> {
             Error(error) => {
                 if let Some(rp) = msg.result {
                     // this shares some code with syscall.resolve()
-                    let kpid = get_outbound_promise(vd, self.promises, rp);
+                    let kpid = get_outbound_promise(vd, rp);
                     let kr = KernelResolution::Rejection(error);
                     send_resolution(self.promises, self.run_queue, kpid, kr);
                 }
@@ -76,13 +75,13 @@ impl<'a> Syscall for SyscallHandler<'a> {
 
     fn subscribe(&mut self, id: VatPromiseID) {
         let vd = self.vat_data.get_mut(&self.for_vat).unwrap();
-        let kpid = get_outbound_promise(vd, self.promises, id);
+        let kpid = get_outbound_promise(vd, id);
         self.promises.subscribe(kpid, self.for_vat);
     }
 
     fn resolve(&mut self, id: VatPromiseID, to: VatResolution) {
         let vd = self.vat_data.get_mut(&self.for_vat).unwrap();
-        let kpid = get_outbound_promise(vd, self.promises, id);
+        let kpid = get_outbound_promise(vd, id);
         let decider = self.promises.decider_of(kpid);
         match decider {
             Some(did) => assert!(did == self.for_vat, "you are not the decider"),

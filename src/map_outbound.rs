@@ -1,13 +1,11 @@
 use super::kernel::{
-    delivery_type, CapData as KernelCapData, CapSlot as KernelCapSlot,
-    Message as KernelMessage, ObjectID as KernelObjectID,
+    CapData as KernelCapData, CapSlot as KernelCapSlot, Message as KernelMessage,
     ObjectTable as KernelObjectTable, PendingDelivery, PromiseID as KernelPromiseID,
     PromiseTable as KernelPromiseTable, Resolution as KernelResolution, VatID,
 };
 use super::vat::{
-    CapData as VatCapData, CapSlot as VatCapSlot, InboundTarget, Message as VatMessage,
-    ObjectID as VatObjectID, PromiseID as VatPromiseID, Resolution as VatResolution,
-    Syscall,
+    CapData as VatCapData, CapSlot as VatCapSlot, Message as VatMessage,
+    PromiseID as VatPromiseID, Resolution as VatResolution,
 };
 use super::vat_data::VatData as KernelVatData;
 
@@ -40,12 +38,7 @@ fn map_outbound_slot(
     }
 }
 
-pub fn get_outbound_slot(
-    vd: &mut KernelVatData,
-    pt: &mut KernelPromiseTable,
-    ot: &mut KernelObjectTable,
-    slot: VatCapSlot,
-) -> KernelCapSlot {
+pub fn get_outbound_slot(vd: &mut KernelVatData, slot: VatCapSlot) -> KernelCapSlot {
     // must already exist
     use VatCapSlot::*;
     match slot {
@@ -83,22 +76,6 @@ fn map_outbound_result(
     vd.promise_clist.map_outbound(id, allocate)
 }
 
-fn map_outbound_message(
-    vd: &mut KernelVatData,
-    pt: &mut KernelPromiseTable,
-    ot: &mut KernelObjectTable,
-    target_vatid: VatID,
-    message: VatMessage,
-) -> KernelMessage {
-    KernelMessage {
-        method: message.method,
-        args: map_outbound_capdata(vd, pt, ot, message.args),
-        result: message
-            .result
-            .map(|rp| map_outbound_result(vd, pt, target_vatid, rp)),
-    }
-}
-
 pub fn map_outbound_send(
     vd: &mut KernelVatData,
     pt: &mut KernelPromiseTable,
@@ -123,11 +100,7 @@ pub fn map_outbound_send(
     }
 }
 
-pub fn get_outbound_promise(
-    vd: &mut KernelVatData,
-    pt: &mut KernelPromiseTable,
-    id: VatPromiseID,
-) -> KernelPromiseID {
+pub fn get_outbound_promise(vd: &mut KernelVatData, id: VatPromiseID) -> KernelPromiseID {
     // this is for resolutions, not for answers. must already exist
     // TODO: check that the sending vat is the decider
     vd.promise_clist.get_outbound(id).unwrap()

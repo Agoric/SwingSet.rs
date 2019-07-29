@@ -4,7 +4,7 @@ use super::map_inbound::{
     map_inbound_message, map_inbound_promise, map_inbound_resolution, map_inbound_target,
 };
 use super::syscall::SyscallHandler;
-use super::vat::{Dispatch, ObjectID as VatObjectID, PromiseID as VatPromiseID, Syscall};
+use super::vat::Dispatch;
 use super::vat_data::VatData;
 use std::collections::{HashMap, HashSet, VecDeque};
 
@@ -369,17 +369,17 @@ mod test {
         impl Dispatch for EmptyDispatch {
             fn deliver(
                 &mut self,
-                syscall: &mut dyn Syscall,
-                target: InboundTarget,
-                msg: Message,
+                _syscall: &mut dyn Syscall,
+                _target: InboundTarget,
+                _msg: Message,
             ) {
             }
-            fn subscribe(&mut self, syscall: &mut dyn Syscall, id: PromiseID) {}
+            fn subscribe(&mut self, _syscall: &mut dyn Syscall, _id: PromiseID) {}
             fn notify_resolved(
                 &mut self,
-                syscall: &mut dyn Syscall,
-                id: PromiseID,
-                to: Resolution,
+                _syscall: &mut dyn Syscall,
+                _id: PromiseID,
+                _to: Resolution,
             ) {
             }
         }

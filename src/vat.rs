@@ -59,9 +59,14 @@ pub enum InboundTarget {
 }
 
 pub trait Dispatch {
-    fn deliver(&mut self, target: InboundTarget, msg: Message);
-    fn subscribe(&mut self, id: PromiseID);
-    fn notify_resolved(&mut self, id: PromiseID, to: Resolution);
+    fn deliver(&mut self, syscall: &mut dyn Syscall, target: InboundTarget, msg: Message);
+    fn subscribe(&mut self, syscall: &mut dyn Syscall, id: PromiseID);
+    fn notify_resolved(
+        &mut self,
+        syscall: &mut dyn Syscall,
+        id: PromiseID,
+        to: Resolution,
+    );
 }
 
 pub trait Syscall {

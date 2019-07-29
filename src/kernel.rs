@@ -1,6 +1,10 @@
 #![allow(dead_code)]
 
-use super::vat::{Dispatch, ObjectID as VatObjectID, PromiseID as VatPromiseID};
+use super::map_inbound::{
+    map_inbound_message, map_inbound_promise, map_inbound_resolution, map_inbound_target,
+};
+use super::map_outbound::SyscallHandler;
+use super::vat::{Dispatch, ObjectID as VatObjectID, PromiseID as VatPromiseID, Syscall};
 use super::vat_data::VatData;
 use std::collections::{HashMap, HashSet, VecDeque};
 
@@ -162,6 +166,61 @@ impl Kernel {
             objects: ObjectTable::new(),
             promises: PromiseTable::new(),
             run_queue: RunQueue::default(),
+        }
+    }
+
+    fn process(&mut self, pd: PendingDelivery) {
+        let ot = &self.objects;
+        let pt = &self.promises;
+        match pd {
+            PendingDelivery::Deliver { target, message } => {
+                let vat_id = match target {
+                    CapSlot::Object(id) => ot.owner_of(id),
+                    CapSlot::Promise(id) => pt.decider_of(id),
+                };
+                let vd = self.vat_data.get_mut(&vat_id).unwrap();
+                let vt = map_inbound_target(vd, ot, pt, target);
+                let vmsg = map_inbound_message(vd, ot, pt, message);
+                drop(vd);
+                let mut s = SyscallHandler::new();
+                let dispatch = self.vat_dispatch.get_mut(&vat_id).unwrap();
+                dispatch.deliver(&mut s, vt, vmsg)
+            }
+            PendingDelivery::Notify {
+                vat_id,
+                promise,
+                resolution,
+            } => {
+                let vd = self.vat_data.get_mut(&vat_id).unwrap();
+                let vpid = map_inbound_promise(vd, pt, promise);
+                let vres = map_inbound_resolution(vd, ot, pt, resolution);
+                drop(vd);
+                let mut s = SyscallHandler::new();
+                let dispatch = self.vat_dispatch.get_mut(&vat_id).unwrap();
+                dispatch.notify_resolved(&mut s, vpid, vres)
+            }
+        };
+    }
+
+    fn get_next(&mut self) -> Option<PendingDelivery> {
+        self.run_queue.0.pop_front()
+    }
+
+    pub fn step(&mut self) -> bool {
+        println!("kernel.step");
+        if let Some(pd) = self.get_next() {
+            self.process(pd);
+            return true;
+        }
+        false
+    }
+
+    pub fn run(&mut self) {
+        println!("kernel.run");
+        loop {
+            if !self.step() {
+                return;
+            }
         }
     }
 }

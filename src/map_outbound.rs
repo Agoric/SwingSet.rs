@@ -7,6 +7,7 @@ use super::kernel::{
 use super::vat::{
     CapData as VatCapData, CapSlot as VatCapSlot, InboundTarget, Message as VatMessage,
     ObjectID as VatObjectID, PromiseID as VatPromiseID, Resolution as VatResolution,
+    Syscall,
 };
 use super::vat_data::VatData as KernelVatData;
 
@@ -30,9 +31,7 @@ fn map_outbound_slot(
 ) -> KernelCapSlot {
     use VatCapSlot::*;
     match slot {
-        Promise(id) => {
-            KernelCapSlot::Promise(map_outbound_promise(vd, pt, id))
-        }
+        Promise(id) => KernelCapSlot::Promise(map_outbound_promise(vd, pt, id)),
         Object(id) => KernelCapSlot::Object({
             let owner = vd.id;
             let allocate = || ot.allocate(owner);
@@ -50,12 +49,8 @@ fn get_outbound_slot(
     // must already exist
     use VatCapSlot::*;
     match slot {
-        Promise(id) => {
-            KernelCapSlot::Promise(vd.promise_clist.get_outbound(id).unwrap())
-        }
-        Object(id) => {
-            KernelCapSlot::Object(vd.object_clist.get_outbound(id).unwrap())
-        }
+        Promise(id) => KernelCapSlot::Promise(vd.promise_clist.get_outbound(id).unwrap()),
+        Object(id) => KernelCapSlot::Object(vd.object_clist.get_outbound(id).unwrap()),
     }
 }
 
@@ -158,4 +153,16 @@ fn map_outbound_resolution(
             KernelResolution::Rejection(map_outbound_capdata(vd, pt, ot, vdata))
         }
     }
+}
+
+pub struct SyscallHandler {}
+impl SyscallHandler {
+    pub fn new() -> Self {
+        SyscallHandler {}
+    }
+}
+impl Syscall for SyscallHandler {
+    fn send(&mut self, target: VatCapSlot, msg: VatMessage) {}
+    fn subscribe(&mut self, id: VatPromiseID) {}
+    fn resolve(&mut self, id: VatPromiseID, to: VatResolution) {}
 }

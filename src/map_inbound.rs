@@ -14,7 +14,7 @@ use super::vat_data::VatData as KernelVatData;
 // This may require allocation in the target Vat's c-lists, but not the
 // kernel tables.
 
-fn map_inbound_promise(
+pub fn map_inbound_promise(
     vd: &mut KernelVatData,
     pt: &KernelPromiseTable,
     id: KernelPromiseID,
@@ -49,7 +49,7 @@ fn map_inbound_slot(
     }
 }
 
-fn map_inbound_target(
+pub fn map_inbound_target(
     vd: &mut KernelVatData,
     ot: &KernelObjectTable,
     pt: &KernelPromiseTable,
@@ -77,7 +77,7 @@ fn map_inbound_capdata(
     }
 }
 
-fn map_inbound_message(
+pub fn map_inbound_message(
     vd: &mut KernelVatData,
     ot: &KernelObjectTable,
     pt: &KernelPromiseTable,
@@ -90,7 +90,7 @@ fn map_inbound_message(
     }
 }
 
-fn map_inbound_resolution(
+pub fn map_inbound_resolution(
     vd: &mut KernelVatData,
     ot: &KernelObjectTable,
     pt: &KernelPromiseTable,

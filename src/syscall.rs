@@ -1,5 +1,10 @@
-use super::kernel::{ObjectTable, PromiseTable, RunQueue, VatID};
-use super::map_outbound::{get_outbound_promise, map_outbound_send};
+use super::kernel::{
+    delivery_type, DeliveryType, ObjectTable, PendingDelivery, PromiseTable, RunQueue,
+    VatID,
+};
+use super::map_outbound::{
+    get_outbound_promise, get_outbound_slot, map_outbound_resolution, map_outbound_send,
+};
 use super::vat::{
     CapSlot as VatCapSlot, Message as VatMessage, PromiseID as VatPromiseID,
     Resolution as VatResolution, Syscall,
@@ -40,13 +45,45 @@ impl<'a> SyscallHandler<'a> {
 impl<'a> Syscall for SyscallHandler<'a> {
     fn send(&mut self, target: VatCapSlot, msg: VatMessage) {
         let vd = self.vat_data.get_mut(&self.for_vat).unwrap();
-        let pd = map_outbound_send(vd, self.promises, self.objects, target, msg);
-        self.run_queue.add(pd);
+        let ktarget = get_outbound_slot(vd, self.promises, self.objects, target);
+        let dt = delivery_type(ktarget, self.objects, self.promises);
+        use DeliveryType::*;
+        match dt {
+            Send(decider_vatid) => {
+                let pd = map_outbound_send(
+                    vd,
+                    self.promises,
+                    self.objects,
+                    ktarget,
+                    decider_vatid,
+                    msg,
+                );
+                self.run_queue.add(pd);
+            }
+            Error(..) => panic!("not implemented yet"),
+        };
     }
     fn subscribe(&mut self, id: VatPromiseID) {
         let vd = self.vat_data.get_mut(&self.for_vat).unwrap();
         let kpid = get_outbound_promise(vd, self.promises, id);
         self.promises.subscribe(kpid, self.for_vat);
     }
-    fn resolve(&mut self, id: VatPromiseID, to: VatResolution) {}
+    fn resolve(&mut self, id: VatPromiseID, to: VatResolution) {
+        let vd = self.vat_data.get_mut(&self.for_vat).unwrap();
+        let kpid = get_outbound_promise(vd, self.promises, id);
+        let decider = self.promises.decider_of(kpid);
+        match decider {
+            Some(did) => assert!(did == self.for_vat, "you are not the decider"),
+            None => panic!("promise is already resolved"),
+        }
+        let kr = map_outbound_resolution(vd, self.promises, self.objects, to);
+        for s in self.promises.subscribers_of(kpid) {
+            let n = PendingDelivery::Notify {
+                vat_id: s,
+                promise: kpid,
+                resolution: kr.clone(),
+            };
+            self.run_queue.add(n);
+        }
+    }
 }

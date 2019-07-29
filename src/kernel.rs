@@ -53,14 +53,16 @@ pub struct PromiseID(pub usize);
 
 #[derive(Debug, Eq, PartialEq, Clone)]
 enum PromiseState {
-    Unresolved { subscribers: HashSet<VatID> },
+    Unresolved {
+        decider: VatID,
+        subscribers: HashSet<VatID>,
+    },
     FulfilledToTarget(ObjectID),
     FulfilledToData(CapData),
     Rejected(CapData),
 }
 
 pub struct Promise {
-    decider: VatID,
     pub allocator: VatID,
     state: PromiseState,
 }
@@ -82,16 +84,10 @@ impl PromiseTable {
         let id = PromiseID(self.next_promise_id);
         self.next_promise_id += 1;
         let state = PromiseState::Unresolved {
+            decider,
             subscribers: HashSet::default(),
         };
-        self.promises.insert(
-            id,
-            Promise {
-                decider,
-                allocator,
-                state,
-            },
-        );
+        self.promises.insert(id, Promise { allocator, state });
         id
     }
 
@@ -99,19 +95,39 @@ impl PromiseTable {
         self.promises.get(&id).unwrap().allocator
     }
 
-    pub fn decider_of(&self, id: PromiseID) -> VatID {
-        self.promises.get(&id).unwrap().decider
+    pub fn decider_of(&self, id: PromiseID) -> Option<VatID> {
+        use PromiseState::*;
+        match self.promises.get(&id).unwrap().state {
+            Unresolved { decider, .. } => Some(decider),
+            _ => None,
+        }
     }
 
     pub fn subscribe(&mut self, id: PromiseID, vat_id: VatID) {
-        let mut p = self.promises.get_mut(&id).unwrap();
+        let p = self.promises.get_mut(&id).unwrap();
         match &mut p.state {
             PromiseState::Unresolved {
                 ref mut subscribers,
+                ..
             } => {
                 subscribers.insert(vat_id);
             }
             _ => panic!("must be unresolved"),
+        }
+    }
+
+    pub fn subscribers_of(&self, id: PromiseID) -> Vec<VatID> {
+        // todo: return iterator
+        match &self.promises.get(&id).unwrap().state {
+            PromiseState::Unresolved { subscribers, .. } => {
+                //subscribers.iter().collect()
+                let mut out = vec![];
+                for s in subscribers.iter() {
+                    out.push(*s);
+                }
+                out
+            }
+            _ => panic!("Promise is resolved, no subscribers"),
         }
     }
 }
@@ -137,7 +153,7 @@ pub struct Message {
     pub result: Option<PromiseID>,
 }
 
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub enum Resolution {
     Reference(CapSlot),
     Data(CapData),
@@ -174,6 +190,39 @@ struct Kernel {
     run_queue: RunQueue,
 }
 
+#[derive(Debug)]
+pub enum DeliveryType {
+    Send(VatID),
+    Error(CapData),
+}
+
+pub fn delivery_type(
+    target: CapSlot,
+    ot: &ObjectTable,
+    pt: &PromiseTable,
+) -> DeliveryType {
+    use CapSlot::*;
+    use DeliveryType::*;
+    use PromiseState::*;
+    match target {
+        Object(oid) => Send(ot.owner_of(oid)),
+        Promise(pid) => match &pt.promises.get(&pid).unwrap().state {
+            Unresolved { decider, .. } => Send(*decider),
+            FulfilledToTarget(oid) => Send(ot.owner_of(*oid)),
+            FulfilledToData(data) => {
+                let mut msg = Vec::from("Cannot send message to data (");
+                msg.extend(data.body.iter());
+                msg.extend(Vec::from(")"));
+                Error(CapData {
+                    body: msg,
+                    slots: vec![],
+                })
+            }
+            Rejected(error) => Error(error.clone()),
+        },
+    }
+}
+
 impl Kernel {
     fn new() -> Self {
         Kernel {
@@ -191,9 +240,11 @@ impl Kernel {
         let pt = &self.promises;
         match pd {
             PendingDelivery::Deliver { target, message } => {
-                let vat_id = match target {
-                    CapSlot::Object(id) => ot.owner_of(id),
-                    CapSlot::Promise(id) => pt.decider_of(id),
+                let dt = delivery_type(target, ot, pt);
+                use DeliveryType::*;
+                let vat_id = match dt {
+                    Send(vid) => vid,
+                    Error(msg) => panic!("not implemented yet"),
                 };
                 let vd = self.vat_data.get_mut(&vat_id).unwrap();
                 let vt = map_inbound_target(vd, ot, pt, target);

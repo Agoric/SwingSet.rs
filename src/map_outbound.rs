@@ -1,8 +1,8 @@
 use super::kernel::{
-    CapData as KernelCapData, CapSlot as KernelCapSlot, Message as KernelMessage,
-    ObjectID as KernelObjectID, ObjectTable as KernelObjectTable, PendingDelivery,
-    PromiseID as KernelPromiseID, PromiseTable as KernelPromiseTable,
-    Resolution as KernelResolution, VatID,
+    delivery_type, CapData as KernelCapData, CapSlot as KernelCapSlot,
+    Message as KernelMessage, ObjectID as KernelObjectID,
+    ObjectTable as KernelObjectTable, PendingDelivery, PromiseID as KernelPromiseID,
+    PromiseTable as KernelPromiseTable, Resolution as KernelResolution, VatID,
 };
 use super::vat::{
     CapData as VatCapData, CapSlot as VatCapSlot, InboundTarget, Message as VatMessage,
@@ -40,7 +40,7 @@ fn map_outbound_slot(
     }
 }
 
-fn get_outbound_slot(
+pub fn get_outbound_slot(
     vd: &mut KernelVatData,
     pt: &mut KernelPromiseTable,
     ot: &mut KernelObjectTable,
@@ -103,26 +103,22 @@ pub fn map_outbound_send(
     vd: &mut KernelVatData,
     pt: &mut KernelPromiseTable,
     ot: &mut KernelObjectTable,
-    target: VatCapSlot,
+    target: KernelCapSlot,
+    decider_vatid: VatID,
     message: VatMessage,
 ) -> PendingDelivery {
-    // look up the target first, promise or object, and find it's decider/owner
-    // then if a result promise must be allocated, use that as the decider
-    let kt = get_outbound_slot(vd, pt, ot, target); // must already exist
-    use KernelCapSlot::*;
-    let target_vatid = match kt {
-        Promise(id) => pt.decider_of(id),
-        Object(id) => ot.owner_of(id),
-    };
+    // we've already mapped the target to a KernelCapSlot, and looked up the
+    // decider/owner to use for any result promise that we might allocate
+
     let km = KernelMessage {
         method: message.method,
         args: map_outbound_capdata(vd, pt, ot, message.args),
         result: message
             .result
-            .map(|rp| map_outbound_result(vd, pt, target_vatid, rp)),
+            .map(|rp| map_outbound_result(vd, pt, decider_vatid, rp)),
     };
     PendingDelivery::Deliver {
-        target: kt,
+        target,
         message: km,
     }
 }
@@ -137,7 +133,7 @@ pub fn get_outbound_promise(
     vd.promise_clist.get_outbound(id).unwrap()
 }
 
-fn map_outbound_resolution(
+pub fn map_outbound_resolution(
     vd: &mut KernelVatData,
     pt: &mut KernelPromiseTable,
     ot: &mut KernelObjectTable,

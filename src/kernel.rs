@@ -3,7 +3,7 @@
 use super::map_inbound::{
     map_inbound_message, map_inbound_promise, map_inbound_resolution, map_inbound_target,
 };
-use super::map_outbound::SyscallHandler;
+use super::syscall::SyscallHandler;
 use super::vat::{Dispatch, ObjectID as VatObjectID, PromiseID as VatPromiseID, Syscall};
 use super::vat_data::VatData;
 use std::collections::{HashMap, HashSet, VecDeque};
@@ -181,7 +181,7 @@ impl Kernel {
                 let vd = self.vat_data.get_mut(&vat_id).unwrap();
                 let vt = map_inbound_target(vd, ot, pt, target);
                 let vmsg = map_inbound_message(vd, ot, pt, message);
-                drop(vd);
+                //drop(vd);
                 let mut s = SyscallHandler::new();
                 let dispatch = self.vat_dispatch.get_mut(&vat_id).unwrap();
                 dispatch.deliver(&mut s, vt, vmsg)
@@ -194,7 +194,7 @@ impl Kernel {
                 let vd = self.vat_data.get_mut(&vat_id).unwrap();
                 let vpid = map_inbound_promise(vd, pt, promise);
                 let vres = map_inbound_resolution(vd, ot, pt, resolution);
-                drop(vd);
+                //drop(vd);
                 let mut s = SyscallHandler::new();
                 let dispatch = self.vat_dispatch.get_mut(&vat_id).unwrap();
                 dispatch.notify_resolved(&mut s, vpid, vres)

@@ -1,4 +1,5 @@
 use super::kernel::{ObjectTable, PromiseTable, RunQueue, VatID};
+use super::map_outbound::{get_outbound_promise, map_outbound_send};
 use super::vat::{
     CapSlot as VatCapSlot, Message as VatMessage, PromiseID as VatPromiseID,
     Resolution as VatResolution, Syscall,
@@ -38,9 +39,14 @@ impl<'a> SyscallHandler<'a> {
 }
 impl<'a> Syscall for SyscallHandler<'a> {
     fn send(&mut self, target: VatCapSlot, msg: VatMessage) {
-        //let pd = map_outbound_send(vd, pt, ot, target, msg);
-        //run_queue.push_back(pd);
+        let vd = self.vat_data.get_mut(&self.for_vat).unwrap();
+        let pd = map_outbound_send(vd, self.promises, self.objects, target, msg);
+        self.run_queue.add(pd);
     }
-    fn subscribe(&mut self, id: VatPromiseID) {}
+    fn subscribe(&mut self, id: VatPromiseID) {
+        let vd = self.vat_data.get_mut(&self.for_vat).unwrap();
+        let kpid = get_outbound_promise(vd, self.promises, id);
+        self.promises.subscribe(kpid, self.for_vat);
+    }
     fn resolve(&mut self, id: VatPromiseID, to: VatResolution) {}
 }

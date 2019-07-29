@@ -102,6 +102,18 @@ impl PromiseTable {
     pub fn decider_of(&self, id: PromiseID) -> VatID {
         self.promises.get(&id).unwrap().decider
     }
+
+    pub fn subscribe(&mut self, id: PromiseID, vat_id: VatID) {
+        let mut p = self.promises.get_mut(&id).unwrap();
+        match &mut p.state {
+            PromiseState::Unresolved {
+                ref mut subscribers,
+            } => {
+                subscribers.insert(vat_id);
+            }
+            _ => panic!("must be unresolved"),
+        }
+    }
 }
 
 #[derive(Debug, Eq, PartialEq, Hash, Copy, Clone)]
@@ -147,6 +159,11 @@ pub enum PendingDelivery {
 
 #[derive(Debug, Default)]
 pub struct RunQueue(VecDeque<PendingDelivery>);
+impl RunQueue {
+    pub fn add(&mut self, pd: PendingDelivery) {
+        self.0.push_back(pd)
+    }
+}
 
 struct Kernel {
     vat_names: HashMap<VatName, VatID>,

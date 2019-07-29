@@ -99,7 +99,7 @@ fn map_outbound_message(
     }
 }
 
-fn map_outbound_send(
+pub fn map_outbound_send(
     vd: &mut KernelVatData,
     pt: &mut KernelPromiseTable,
     ot: &mut KernelObjectTable,
@@ -127,7 +127,7 @@ fn map_outbound_send(
     }
 }
 
-fn get_outbound_promise(
+pub fn get_outbound_promise(
     vd: &mut KernelVatData,
     pt: &mut KernelPromiseTable,
     id: VatPromiseID,

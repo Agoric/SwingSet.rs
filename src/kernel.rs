@@ -270,6 +270,8 @@ impl Kernel {
     fn add_vat(&mut self, name: &str, dispatch: Box<dyn Dispatch>) -> VatID {
         let id = self.vat_names.add(name);
         self.vat_dispatch.insert(id, dispatch);
+        self.vat_data.insert(id, VatData::new(id));
+        // todo: add object id for the root
         id
     }
 
@@ -357,4 +359,34 @@ mod test {
     fn test_create() {
         let mut _k = Kernel::new();
     }
+
+    #[test]
+    fn test_add() {
+        struct EmptyDispatch {}
+        use super::super::vat::{
+            Dispatch, InboundTarget, Message, PromiseID, Resolution, Syscall,
+        };
+        impl Dispatch for EmptyDispatch {
+            fn deliver(
+                &mut self,
+                syscall: &mut dyn Syscall,
+                target: InboundTarget,
+                msg: Message,
+            ) {
+            }
+            fn subscribe(&mut self, syscall: &mut dyn Syscall, id: PromiseID) {}
+            fn notify_resolved(
+                &mut self,
+                syscall: &mut dyn Syscall,
+                id: PromiseID,
+                to: Resolution,
+            ) {
+            }
+        }
+        let d = EmptyDispatch {};
+        let mut k = Kernel::new();
+        let id = k.add_vat("vat-a", Box::new(d));
+        assert_eq!(id, VatID(0));
+    }
+
 }

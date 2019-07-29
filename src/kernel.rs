@@ -181,8 +181,24 @@ impl RunQueue {
     }
 }
 
+#[derive(Debug, Default)]
+struct VatNames {
+    names: HashMap<VatName, VatID>,
+    next_id: usize,
+}
+
+impl VatNames {
+    pub fn add(&mut self, name: &str) -> VatID {
+        let name = VatName(String::from(name));
+        let id = VatID(self.next_id);
+        self.next_id += 1;
+        self.names.insert(name, id);
+        id
+    }
+}
+
 struct Kernel {
-    vat_names: HashMap<VatName, VatID>,
+    vat_names: VatNames,
     vat_dispatch: HashMap<VatID, Box<dyn Dispatch>>,
     vat_data: HashMap<VatID, VatData>,
     objects: ObjectTable,
@@ -242,13 +258,19 @@ pub fn send_resolution(
 impl Kernel {
     fn new() -> Self {
         Kernel {
-            vat_names: HashMap::default(),
+            vat_names: VatNames::default(),
             vat_dispatch: HashMap::default(),
             vat_data: HashMap::default(),
             objects: ObjectTable::new(),
             promises: PromiseTable::new(),
             run_queue: RunQueue::default(),
         }
+    }
+
+    fn add_vat(&mut self, name: &str, dispatch: Box<dyn Dispatch>) -> VatID {
+        let id = self.vat_names.add(name);
+        self.vat_dispatch.insert(id, dispatch);
+        id
     }
 
     fn process(&mut self, pd: PendingDelivery) {

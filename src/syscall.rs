@@ -10,7 +10,10 @@ impl SyscallHandler {
     }
 }
 impl Syscall for SyscallHandler {
-    fn send(&mut self, target: VatCapSlot, msg: VatMessage) {}
+    fn send(&mut self, target: VatCapSlot, msg: VatMessage) {
+        //let pd = map_outbound_send(vd, pt, ot, target, msg);
+        //run_queue.push_back(pd);
+    }
     fn subscribe(&mut self, id: VatPromiseID) {}
     fn resolve(&mut self, id: VatPromiseID, to: VatResolution) {}
 }

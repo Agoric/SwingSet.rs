@@ -129,7 +129,7 @@ pub enum Resolution {
 }
 
 #[derive(Debug)]
-enum PendingDelivery {
+pub enum PendingDelivery {
     Deliver {
         target: CapSlot,
         message: Message,

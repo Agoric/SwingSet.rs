@@ -1,5 +1,6 @@
 use super::kernel::{
-    delivery_type, DeliveryType, ObjectTable, PendingDelivery, PromiseTable, RunQueue,
+    delivery_type, send_resolution, DeliveryType, ObjectTable, PendingDelivery,
+    PromiseID as KernelPromiseID, PromiseTable, Resolution as KernelResolution, RunQueue,
     VatID,
 };
 use super::map_outbound::{
@@ -42,6 +43,7 @@ impl<'a> SyscallHandler<'a> {
         }
     }
 }
+
 impl<'a> Syscall for SyscallHandler<'a> {
     fn send(&mut self, target: VatCapSlot, msg: VatMessage) {
         let vd = self.vat_data.get_mut(&self.for_vat).unwrap();
@@ -60,14 +62,24 @@ impl<'a> Syscall for SyscallHandler<'a> {
                 );
                 self.run_queue.add(pd);
             }
-            Error(..) => panic!("not implemented yet"),
+            // for errors, ignore everything except the result
+            Error(error) => {
+                if let Some(rp) = msg.result {
+                    // this shares some code with syscall.resolve()
+                    let kpid = get_outbound_promise(vd, self.promises, rp);
+                    let kr = KernelResolution::Rejection(error);
+                    send_resolution(self.promises, self.run_queue, kpid, kr);
+                }
+            }
         };
     }
+
     fn subscribe(&mut self, id: VatPromiseID) {
         let vd = self.vat_data.get_mut(&self.for_vat).unwrap();
         let kpid = get_outbound_promise(vd, self.promises, id);
         self.promises.subscribe(kpid, self.for_vat);
     }
+
     fn resolve(&mut self, id: VatPromiseID, to: VatResolution) {
         let vd = self.vat_data.get_mut(&self.for_vat).unwrap();
         let kpid = get_outbound_promise(vd, self.promises, id);
@@ -77,13 +89,6 @@ impl<'a> Syscall for SyscallHandler<'a> {
             None => panic!("promise is already resolved"),
         }
         let kr = map_outbound_resolution(vd, self.promises, self.objects, to);
-        for s in self.promises.subscribers_of(kpid) {
-            let n = PendingDelivery::Notify {
-                vat_id: s,
-                promise: kpid,
-                resolution: kr.clone(),
-            };
-            self.run_queue.add(n);
-        }
+        send_resolution(self.promises, self.run_queue, kpid, kr);
     }
 }

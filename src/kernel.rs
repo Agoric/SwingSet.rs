@@ -223,6 +223,22 @@ pub fn delivery_type(
     }
 }
 
+pub fn send_resolution(
+    pt: &PromiseTable,
+    rq: &mut RunQueue,
+    id: PromiseID,
+    r: Resolution,
+) {
+    for s in pt.subscribers_of(id) {
+        let n = PendingDelivery::Notify {
+            vat_id: s,
+            promise: id,
+            resolution: r.clone(),
+        };
+        rq.add(n);
+    }
+}
+
 impl Kernel {
     fn new() -> Self {
         Kernel {
@@ -244,7 +260,13 @@ impl Kernel {
                 use DeliveryType::*;
                 let vat_id = match dt {
                     Send(vid) => vid,
-                    Error(msg) => panic!("not implemented yet"),
+                    Error(error) => {
+                        if let Some(kpid) = message.result {
+                            let kr = Resolution::Rejection(error);
+                            send_resolution(pt, &mut self.run_queue, kpid, kr);
+                        }
+                        return;
+                    }
                 };
                 let vd = self.vat_data.get_mut(&vat_id).unwrap();
                 let vt = map_inbound_target(vd, ot, pt, target);

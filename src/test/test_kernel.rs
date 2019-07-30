@@ -13,7 +13,7 @@ struct Vat1Dispatch {
 impl Dispatch for Vat1Dispatch {
     fn deliver(
         &mut self,
-        _syscall: &mut dyn Syscall,
+        syscall: &mut dyn Syscall,
         target: InboundTarget,
         msg: Message,
     ) -> () {
@@ -26,15 +26,8 @@ impl Dispatch for Vat1Dispatch {
                 assert_eq!(msg.args.slots, vec![CapSlot::Object(ObjectID(0))]);
                 assert_eq!(msg.result, None);
                 self.log.borrow_mut().push(1);
-                /*
-                let t = VatSendTarget::Import(VatImportID(1));
-                let arg1 = VatArgSlot::Export(VatExportID(22));
-                let vmsg = OutboundVatMessage::new("foo", b"body", vec![arg1]);
-                self.p = Some(self.syscall.send(t, vmsg));
-                assert_eq!(self.p, Some(VatPromiseID(0)));
-                println!(" got promise {:?}", self.p);
-                 */
             }
+
             InboundTarget::Object(ObjectID(2)) => {
                 println!(" deliver[2]");
                 assert_eq!(msg.method, "foo");
@@ -42,6 +35,24 @@ impl Dispatch for Vat1Dispatch {
                 assert_eq!(msg.args.slots, vec![CapSlot::Object(ObjectID(2))],);
                 assert_eq!(msg.result, None);
                 self.log.borrow_mut().push(2);
+            }
+
+            InboundTarget::Object(ObjectID(3)) => {
+                println!(" deliver[3]");
+                assert_eq!(msg.method, "foo");
+                assert_eq!(msg.args.body, b"foobody");
+                assert_eq!(msg.args.slots, vec![CapSlot::Object(ObjectID(-4))],);
+                assert_eq!(msg.result, None);
+                self.log.borrow_mut().push(3);
+
+                // o4!bar(barbody, [o22])
+                let t = *msg.args.slots.get(0).unwrap();
+                let arg1 = CapSlot::Object(ObjectID(22));
+                let vmsg = Message::new("bar", b"barbody", &vec![arg1], None);
+                syscall.send(t, vmsg);
+                //assert_eq!(self.p, Some(VatPromiseID(0)));
+                //println!(" got promise {:?}", self.p);
+
                 /*
                 assert_eq!(msg.resolver, Some(VatResolverID(0)));
                 let arg2 = VatArgSlot::Export(VatExportID(23));
@@ -54,6 +65,15 @@ impl Dispatch for Vat1Dispatch {
                 self.log.borrow_mut().push(2);
                 */
             }
+
+            InboundTarget::Object(ObjectID(4)) => {
+                assert_eq!(msg.method, "bar");
+                assert_eq!(msg.args.body, b"barbody");
+                assert_eq!(msg.args.slots, vec![CapSlot::Object(ObjectID(-1))],);
+                assert_eq!(msg.result, None);
+                self.log.borrow_mut().push(4);
+            }
+
             _ => panic!("unknown target {:?}", target),
         };
     }
@@ -95,4 +115,30 @@ fn test_build() {
     assert_eq!(*r.borrow(), vec![1]);
     k.run();
     assert_eq!(*r.borrow(), vec![1, 2]);
+}
+
+#[test]
+fn test_syscall() {
+    let log: Vec<u32> = vec![];
+    let r = Rc::new(RefCell::new(log));
+    let dleft = Vat1Dispatch { log: r.clone() };
+    let dright = Vat1Dispatch { log: r.clone() };
+    let mut k = Kernel::new();
+    let vleft = k.add_vat("left", Box::new(dleft));
+    let vright = k.add_vat("right", Box::new(dright));
+    let o3 = k.add_export(vleft, 3);
+    let o4 = k.add_import_export_pair(vleft, -4, vright, 4);
+
+    k.push_deliver(
+        o3,
+        "foo",
+        Vec::from("foobody"),
+        &vec![KernelCapSlot::Object(o4)],
+    );
+    assert_eq!(*r.borrow(), vec![]);
+    k.step();
+    assert_eq!(*r.borrow(), vec![3]);
+    k.dump();
+    k.step();
+    assert_eq!(*r.borrow(), vec![3, 4]);
 }

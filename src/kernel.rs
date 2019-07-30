@@ -8,6 +8,7 @@ use super::syscall::SyscallHandler;
 use super::vat::{Dispatch, ObjectID as VatObjectID};
 use super::vat_data::VatData;
 use std::collections::{HashMap, HashSet, VecDeque};
+use std::fmt;
 
 #[derive(PartialEq, Eq, Debug, Hash)]
 struct VatName(String);
@@ -141,10 +142,22 @@ pub enum CapSlot {
 
 /// CapData is capability-bearing data, used for the message arguments and
 /// resolving/rejecting promises to non-callable targets
-#[derive(Debug, Eq, PartialEq, Clone)]
+#[derive(Eq, PartialEq, Clone)]
 pub struct CapData {
     pub body: Vec<u8>,
     pub slots: Vec<CapSlot>,
+}
+
+impl fmt::Debug for CapData {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        use std::str;
+        let body = str::from_utf8(&self.body).unwrap_or("<<non-utf8 body>>");
+        write!(
+            f,
+            "(kernel)CapData [ body: <{}>, slots: {:?} ]",
+            body, self.slots
+        )
+    }
 }
 
 #[derive(Debug)]
@@ -320,7 +333,7 @@ impl Kernel {
         import_id: isize,
         to_vat: VatID,
         export_id: isize,
-    ) {
+    ) -> ObjectID {
         assert!(import_id < 0);
         assert!(export_id > 0);
         let koid = {
@@ -330,6 +343,7 @@ impl Kernel {
         };
         let from_vd = self.vat_data.get_mut(&from_vat).unwrap();
         from_vd.object_clist.add(koid, VatObjectID(import_id));
+        koid
     }
 
     pub fn add_export(&mut self, to_vat: VatID, export_id: isize) -> ObjectID {

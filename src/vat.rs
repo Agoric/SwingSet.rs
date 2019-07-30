@@ -45,7 +45,11 @@ impl fmt::Debug for CapData {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         use std::str;
         let body = str::from_utf8(&self.body).unwrap_or("<<non-utf8 body>>");
-        write!(f, "CapData [ body: <{}>, slots: {:?} ]", body, self.slots)
+        write!(
+            f,
+            "(vat)CapData [ body: <{}>, slots: {:?} ]",
+            body, self.slots
+        )
     }
 }
 
@@ -54,6 +58,23 @@ pub struct Message {
     pub method: String,
     pub args: CapData,
     pub result: Option<PromiseID>,
+}
+impl Message {
+    pub fn new(
+        method: &str,
+        body: &[u8],
+        slots: &[CapSlot],
+        result: Option<PromiseID>,
+    ) -> Self {
+        Message {
+            method: String::from(method),
+            args: CapData {
+                body: Vec::from(body),
+                slots: Vec::from(slots),
+            },
+            result,
+        }
+    }
 }
 
 #[derive(Debug)]

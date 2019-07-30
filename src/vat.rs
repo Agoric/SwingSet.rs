@@ -41,6 +41,15 @@ pub struct CapData {
     pub slots: Vec<CapSlot>,
 }
 
+impl CapData {
+    pub fn new(body: &[u8], slots: &[CapSlot]) -> Self {
+        CapData {
+            body: Vec::from(body),
+            slots: Vec::from(slots),
+        }
+    }
+}
+
 impl fmt::Debug for CapData {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         use std::str;

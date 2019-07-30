@@ -89,7 +89,7 @@ impl Dispatch for Vat1Dispatch {
 }
 
 #[test]
-fn test_build() {
+fn test_basic() {
     let log: Vec<u32> = vec![];
     let r = Rc::new(RefCell::new(log));
     let r2 = r.clone();

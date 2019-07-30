@@ -1,17 +1,31 @@
 use super::kernel::{
     CapData as KernelCapData, CapSlot as KernelCapSlot, Message as KernelMessage,
-    ObjectTable as KernelObjectTable, PromiseID as KernelPromiseID,
-    PromiseTable as KernelPromiseTable, Resolution as KernelResolution,
+    ObjectID as KernelObjectID, ObjectTable as KernelObjectTable,
+    PromiseID as KernelPromiseID, PromiseTable as KernelPromiseTable,
+    Resolution as KernelResolution,
 };
 use super::vat::{
     CapData as VatCapData, CapSlot as VatCapSlot, InboundTarget, Message as VatMessage,
-    PromiseID as VatPromiseID, Resolution as VatResolution,
+    ObjectID as VatObjectID, PromiseID as VatPromiseID, Resolution as VatResolution,
 };
 use super::vat_data::VatData as KernelVatData;
 
 // These functions map the arguments of "inbound" kernel->vat dispatch calls.
 // This may require allocation in the target Vat's c-lists, but not the
 // kernel tables.
+
+pub fn map_inbound_object(
+    vd: &mut KernelVatData,
+    ot: &KernelObjectTable,
+    id: KernelObjectID,
+) -> VatObjectID {
+    if ot.owner_of(id) == vd.id {
+        // this is returning home
+        vd.object_clist.get_inbound(id).unwrap()
+    } else {
+        vd.object_clist.map_inbound(id)
+    }
+}
 
 pub fn map_inbound_promise(
     vd: &mut KernelVatData,
@@ -34,14 +48,7 @@ fn map_inbound_slot(
     slot: KernelCapSlot,
 ) -> VatCapSlot {
     match slot {
-        KernelCapSlot::Object(id) => VatCapSlot::Object({
-            if ot.owner_of(id) == vd.id {
-                // this is returning home
-                vd.object_clist.get_inbound(id).unwrap()
-            } else {
-                vd.object_clist.map_inbound(id)
-            }
-        }),
+        KernelCapSlot::Object(id) => VatCapSlot::Object(map_inbound_object(vd, ot, id)),
         KernelCapSlot::Promise(id) => {
             VatCapSlot::Promise(map_inbound_promise(vd, pt, id))
         }

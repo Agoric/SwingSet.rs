@@ -3,19 +3,20 @@
 use super::map_inbound::{
     map_inbound_message, map_inbound_promise, map_inbound_resolution, map_inbound_target,
 };
+use super::map_outbound::map_outbound_object;
 use super::syscall::SyscallHandler;
-use super::vat::Dispatch;
+use super::vat::{Dispatch, ObjectID as VatObjectID};
 use super::vat_data::VatData;
 use std::collections::{HashMap, HashSet, VecDeque};
 
 #[derive(PartialEq, Eq, Debug, Hash)]
 struct VatName(String);
 
-#[derive(PartialEq, Eq, Debug, Hash, Copy, Clone)]
+#[derive(PartialEq, Eq, PartialOrd, Ord, Debug, Hash, Copy, Clone)]
 pub struct VatID(pub usize);
 
-#[derive(Debug, Eq, PartialEq, Hash, Copy, Clone)]
-pub struct ObjectID(usize);
+#[derive(Debug, Eq, PartialEq, PartialOrd, Ord, Hash, Copy, Clone)]
+pub struct ObjectID(pub usize);
 
 #[derive(Debug, Eq, PartialEq, Hash, Copy, Clone)]
 pub struct Object {
@@ -197,10 +198,11 @@ impl VatNames {
     }
 }
 
-struct Kernel {
+pub struct Kernel {
     vat_names: VatNames,
     vat_dispatch: HashMap<VatID, Box<dyn Dispatch>>,
     vat_data: HashMap<VatID, VatData>,
+    vat_roots: HashMap<VatID, ObjectID>,
     objects: ObjectTable,
     promises: PromiseTable,
     run_queue: RunQueue,
@@ -255,24 +257,113 @@ pub fn send_resolution(
     }
 }
 
+impl Default for Kernel {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 impl Kernel {
-    fn new() -> Self {
+    pub fn new() -> Self {
         Kernel {
             vat_names: VatNames::default(),
             vat_dispatch: HashMap::default(),
             vat_data: HashMap::default(),
+            vat_roots: HashMap::default(),
             objects: ObjectTable::new(),
             promises: PromiseTable::new(),
             run_queue: RunQueue::default(),
         }
     }
 
-    fn add_vat(&mut self, name: &str, dispatch: Box<dyn Dispatch>) -> VatID {
-        let id = self.vat_names.add(name);
-        self.vat_dispatch.insert(id, dispatch);
-        self.vat_data.insert(id, VatData::new(id));
-        // todo: add object id for the root
-        id
+    pub fn add_vat(&mut self, name: &str, dispatch: Box<dyn Dispatch>) -> VatID {
+        let vid = self.vat_names.add(name);
+        self.vat_dispatch.insert(vid, dispatch);
+        let mut vd = VatData::new(vid);
+        let koid = self.objects.allocate(vid);
+        vd.object_clist.add(koid, VatObjectID(0));
+        self.vat_roots.insert(vid, koid);
+        self.vat_data.insert(vid, vd);
+        vid
+    }
+
+    pub fn push_bootstrap(&mut self, bootstrap_vat_id: VatID) {
+        let oid = self.add_export(bootstrap_vat_id, 0);
+        let mut vats: Vec<(String, VatID)> = self
+            .vat_names
+            .names
+            .iter()
+            .map(|(k, v)| (String::from(&k.0), *v))
+            .collect();
+        vats.sort();
+        let slots = vats
+            .iter()
+            .map(|(_name, vat_id)| CapSlot::Object(*self.vat_roots.get(&vat_id).unwrap()))
+            .collect();
+        let pd = PendingDelivery::Deliver {
+            target: CapSlot::Object(oid),
+            message: Message {
+                method: String::from("bootstrap"),
+                args: CapData {
+                    body: Vec::from("body"), // TODO: JSON([vats])
+                    slots,
+                },
+                result: None,
+            },
+        };
+        self.run_queue.add(pd);
+    }
+
+    pub fn add_import_export_pair(
+        &mut self,
+        from_vat: VatID,
+        import_id: isize,
+        to_vat: VatID,
+        export_id: isize,
+    ) {
+        assert!(import_id < 0);
+        assert!(export_id > 0);
+        let koid = {
+            let vs = VatObjectID(export_id);
+            let to_vd = self.vat_data.get_mut(&to_vat).unwrap();
+            map_outbound_object(to_vd, &mut self.objects, vs)
+        };
+        let from_vd = self.vat_data.get_mut(&from_vat).unwrap();
+        from_vd.object_clist.add(koid, VatObjectID(import_id));
+    }
+
+    pub fn add_export(&mut self, to_vat: VatID, export_id: isize) -> ObjectID {
+        assert!(export_id >= 0);
+        let vs = VatObjectID(export_id);
+        let to_vd = self.vat_data.get_mut(&to_vat).unwrap();
+        map_outbound_object(to_vd, &mut self.objects, vs)
+    }
+
+    pub fn add_import(&mut self, id: ObjectID, from_vat: VatID, import_id: isize) {
+        assert!(import_id < 0);
+        let from_vd = self.vat_data.get_mut(&from_vat).unwrap();
+        from_vd.object_clist.add(id, VatObjectID(import_id));
+    }
+
+    pub fn push_deliver(
+        &mut self,
+        id: ObjectID,
+        method: &str,
+        body: Vec<u8>,
+        slots: &[CapSlot],
+    ) {
+        let pd = PendingDelivery::Deliver {
+            target: CapSlot::Object(id),
+            message: Message {
+                method: String::from(method),
+                args: CapData {
+                    body,
+                    slots: Vec::from(slots),
+                },
+                result: None,
+            },
+        };
+        self.run_queue.add(pd);
     }
 
     fn process(&mut self, pd: PendingDelivery) {
@@ -349,6 +440,14 @@ impl Kernel {
             }
         }
     }
+
+    pub fn dump(&self) {
+        println!("Kernel Dump:");
+        println!(" run-queue:");
+        for pd in &self.run_queue.0 {
+            println!("  {:?}", pd);
+        }
+    }
 }
 
 #[cfg(test)]
@@ -374,7 +473,7 @@ mod test {
                 _msg: Message,
             ) {
             }
-            fn subscribe(&mut self, _syscall: &mut dyn Syscall, _id: PromiseID) {}
+            //fn subscribe(&mut self, _syscall: &mut dyn Syscall, _id: PromiseID) {}
             fn notify_resolved(
                 &mut self,
                 _syscall: &mut dyn Syscall,

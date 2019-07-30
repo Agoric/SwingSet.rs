@@ -1,11 +1,12 @@
 use super::kernel::{
     CapData as KernelCapData, CapSlot as KernelCapSlot, Message as KernelMessage,
-    ObjectTable as KernelObjectTable, PendingDelivery, PromiseID as KernelPromiseID,
-    PromiseTable as KernelPromiseTable, Resolution as KernelResolution, VatID,
+    ObjectID as KernelObjectID, ObjectTable as KernelObjectTable, PendingDelivery,
+    PromiseID as KernelPromiseID, PromiseTable as KernelPromiseTable,
+    Resolution as KernelResolution, VatID,
 };
 use super::vat::{
     CapData as VatCapData, CapSlot as VatCapSlot, Message as VatMessage,
-    PromiseID as VatPromiseID, Resolution as VatResolution,
+    ObjectID as VatObjectID, PromiseID as VatPromiseID, Resolution as VatResolution,
 };
 use super::vat_data::VatData as KernelVatData;
 
@@ -21,6 +22,16 @@ fn map_outbound_promise(
     vd.promise_clist.map_outbound(id, allocate)
 }
 
+pub fn map_outbound_object(
+    vd: &mut KernelVatData,
+    ot: &mut KernelObjectTable,
+    vid: VatObjectID,
+) -> KernelObjectID {
+    let owner = vd.id;
+    let allocate = || ot.allocate(owner);
+    vd.object_clist.map_outbound(vid, allocate)
+}
+
 fn map_outbound_slot(
     vd: &mut KernelVatData,
     pt: &mut KernelPromiseTable,
@@ -29,12 +40,8 @@ fn map_outbound_slot(
 ) -> KernelCapSlot {
     use VatCapSlot::*;
     match slot {
-        Promise(id) => KernelCapSlot::Promise(map_outbound_promise(vd, pt, id)),
-        Object(id) => KernelCapSlot::Object({
-            let owner = vd.id;
-            let allocate = || ot.allocate(owner);
-            vd.object_clist.map_outbound(id, allocate)
-        }),
+        Promise(vid) => KernelCapSlot::Promise(map_outbound_promise(vd, pt, vid)),
+        Object(vid) => KernelCapSlot::Object(map_outbound_object(vd, ot, vid)),
     }
 }
 

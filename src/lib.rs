@@ -3,7 +3,7 @@ mod kernel;
 mod map_inbound;
 mod map_outbound;
 mod syscall;
-mod vat;
+pub mod vat;
 mod vat_data;
 
 /*
@@ -25,3 +25,8 @@ pub use controller::Controller;
 pub use kernel_types::VatName;
 pub use syscall::{Dispatch, Syscall};
 */
+
+pub use kernel::Kernel;
+
+#[cfg(test)]
+mod test;

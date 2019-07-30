@@ -19,8 +19,8 @@
 /// Export: I allocate the ID, it is already resolved
 /// RemotePromise: Somebody else allocated the ID, someone (maybe me) will resolve it
 /// Import: Somebody else allocated the ID, and it is already resolved
-
 // TODO: we need a name for the pass-by-presence type. "target"? "export"?
+use std::fmt;
 
 #[derive(Debug, Eq, PartialEq, Hash, Copy, Clone)]
 pub struct PromiseID(pub isize);
@@ -35,24 +35,35 @@ pub enum CapSlot {
 
 /// CapData is capability-bearing data, used for the message arguments and
 /// resolving/rejecting promises to non-callable targets
-#[derive(Debug, Clone)]
+#[derive(Clone)]
 pub struct CapData {
     pub body: Vec<u8>,
     pub slots: Vec<CapSlot>,
 }
 
+impl fmt::Debug for CapData {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        use std::str;
+        let body = str::from_utf8(&self.body).unwrap_or("<<non-utf8 body>>");
+        write!(f, "CapData [ body: <{}>, slots: {:?} ]", body, self.slots)
+    }
+}
+
+#[derive(Debug)]
 pub struct Message {
     pub method: String,
     pub args: CapData,
     pub result: Option<PromiseID>,
 }
 
+#[derive(Debug)]
 pub enum Resolution {
     Reference(CapSlot),
     Data(CapData),
     Rejection(CapData),
 }
 
+#[derive(Debug)]
 pub enum InboundTarget {
     Promise(PromiseID),
     Object(ObjectID),
@@ -60,7 +71,7 @@ pub enum InboundTarget {
 
 pub trait Dispatch {
     fn deliver(&mut self, syscall: &mut dyn Syscall, target: InboundTarget, msg: Message);
-    fn subscribe(&mut self, syscall: &mut dyn Syscall, id: PromiseID);
+    //fn subscribe(&mut self, syscall: &mut dyn Syscall, id: PromiseID);
     fn notify_resolved(
         &mut self,
         syscall: &mut dyn Syscall,

@@ -17,8 +17,7 @@ fn map_outbound_promise(
 ) -> KernelPromiseID {
     // this is not for answers
     let decider = vd.id;
-    let allocator = vd.id;
-    let allocate = || pt.allocate_unresolved(decider, allocator);
+    let allocate = || pt.allocate_unresolved(decider);
     vd.promise_clist.map_outbound(id, allocate)
 }
 
@@ -78,8 +77,7 @@ fn map_outbound_result(
 ) -> KernelPromiseID {
     // this is only for answers
     let decider = target_vatid;
-    let allocator = vd.id;
-    let allocate = || pt.allocate_unresolved(decider, allocator);
+    let allocate = || pt.allocate_unresolved(decider);
     vd.promise_clist.map_outbound(id, allocate)
 }
 

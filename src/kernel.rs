@@ -65,7 +65,6 @@ enum PromiseState {
 }
 
 pub struct Promise {
-    pub allocator: VatID,
     state: PromiseState,
 }
 
@@ -82,19 +81,15 @@ impl PromiseTable {
         }
     }
 
-    pub fn allocate_unresolved(&mut self, decider: VatID, allocator: VatID) -> PromiseID {
+    pub fn allocate_unresolved(&mut self, decider: VatID) -> PromiseID {
         let id = PromiseID(self.next_promise_id);
         self.next_promise_id += 1;
         let state = PromiseState::Unresolved {
             decider,
             subscribers: HashSet::default(),
         };
-        self.promises.insert(id, Promise { allocator, state });
+        self.promises.insert(id, Promise { state });
         id
-    }
-
-    pub fn allocator_of(&self, id: PromiseID) -> VatID {
-        self.promises.get(&id).unwrap().allocator
     }
 
     pub fn decider_of(&self, id: PromiseID) -> Option<VatID> {
@@ -398,8 +393,8 @@ impl Kernel {
                     }
                 };
                 let vd = self.vat_data.get_mut(&vat_id).unwrap();
-                let vt = map_inbound_target(vd, ot, pt, target);
-                let vmsg = map_inbound_message(vd, ot, pt, message);
+                let vt = map_inbound_target(vd, target);
+                let vmsg = map_inbound_message(vd, message);
                 //drop(vd);
                 let mut s = SyscallHandler::new(
                     vat_id,
@@ -417,8 +412,8 @@ impl Kernel {
                 resolution,
             } => {
                 let vd = self.vat_data.get_mut(&vat_id).unwrap();
-                let vpid = map_inbound_promise(vd, pt, promise);
-                let vres = map_inbound_resolution(vd, ot, pt, resolution);
+                let vpid = map_inbound_promise(vd, promise);
+                let vres = map_inbound_resolution(vd, resolution);
                 //drop(vd);
                 let mut s = SyscallHandler::new(
                     vat_id,
